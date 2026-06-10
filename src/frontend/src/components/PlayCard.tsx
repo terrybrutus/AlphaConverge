@@ -41,7 +41,7 @@ export function PlayCard({ play, rank }: { play: Play; rank: number }) {
             </p>
             {!play.sample && (
               <p className="text-[11px] text-muted-foreground/80 mt-0.5">
-                {play.categoriesWithData} of 5 categories sourced
+                {play.dataCoverage}% weighted data coverage
                 {play.source ? ` · ${play.source}` : ""}
               </p>
             )}

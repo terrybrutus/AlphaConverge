@@ -1,9 +1,8 @@
-// Stable keys for the six dimension segments (avoids array-index keys).
-const DIMENSION_SLOTS = ["d1", "d2", "d3", "d4", "d5", "d6"];
+const EVIDENCE_SLOTS = ["price", "fundamental", "positioning", "sentiment"];
 
 interface ConvergenceMeterProps {
   score: number; // 0..100
-  dimensionsAligned: number; // 0..6
+  dimensionsAligned: number; // 0..4 independent evidence families
   size?: "sm" | "lg";
 }
 
@@ -32,7 +31,7 @@ export function ConvergenceMeter({
         Convergence
       </span>
       <div className="mt-1.5 flex gap-1" aria-hidden="true">
-        {DIMENSION_SLOTS.map((id, i) => (
+        {EVIDENCE_SLOTS.map((id, i) => (
           <span
             key={id}
             className={`h-1.5 w-3 rounded-full ${
@@ -42,7 +41,7 @@ export function ConvergenceMeter({
         ))}
       </div>
       <span className="mt-1 text-[10px] text-muted-foreground tabular-nums">
-        {dimensionsAligned}/6 dimensions
+        {dimensionsAligned}/4 evidence families
       </span>
     </div>
   );

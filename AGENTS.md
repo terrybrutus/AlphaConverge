@@ -1,9 +1,9 @@
 # Project Guidance
 
 > **AlphaConverge** — a stock-market signal-convergence engine on Caffeine/ICP.
-> It scores US equities across six independent categories (technical,
-> fundamental, microstructure, sentiment, macro, lifecycle stage) and surfaces a
-> ranked list of "Plays" only when ≥4 dimensions converge. The convergence logic
+> It scores US equities across independent evidence families and surfaces a
+> ranked list of "Plays" only when price structure plus at least two non-price
+> company evidence families converge. The convergence logic
 > lives in `src/frontend/src/lib/convergence.ts` and is the core IP. The backend
 > stores raw per-ticker signal facts; the frontend scores them client-side.
 >
@@ -30,9 +30,10 @@
   Vantage key, browser-side fetch). The other four categories are honestly
   marked "no source connected" via `TickerRaw.availability` until their
   providers are wired — they never fabricate signals.
-- Market data is fetched **browser-side** (not via canister HTTP outcalls) to
+- Market data, scoring, and backtests run **browser-side** (not via canister
+  HTTP outcalls) to
   avoid ICP consensus issues with non-deterministic API responses. The canister
-  is for watchlist/history persistence.
+  is only for explicit, authenticated watchlist persistence.
 
 ## Honesty constraints (do not violate)
 

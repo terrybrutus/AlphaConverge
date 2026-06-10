@@ -5,7 +5,7 @@
 //
 // Kept deliberately modest so a scan stays inside free-tier rate limits. This is
 // a starting point, not the whole market — full-universe scanning needs paid
-// data + a scheduled backend (see DATA.md).
+// paid data + an explicitly budgeted external worker (see DATA.md).
 export const STARTER_UNIVERSE: string[] = [
   // Large-cap anchors
   "AAPL",

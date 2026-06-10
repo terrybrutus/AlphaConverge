@@ -23,7 +23,7 @@ function summarizePlay(play: Play): string {
   lines.push(`Price: $${play.price.toFixed(2)}`);
   lines.push(`Lifecycle stage: ${play.stage}`);
   lines.push(
-    `Convergence score: ${play.convergenceScore}/100 across ${play.categoriesAligned}/6 dimensions; surfaced=${play.surfaced}`,
+    `Convergence score: ${play.convergenceScore}/100 across ${play.categoriesAligned}/4 independent evidence families; weighted data coverage=${play.dataCoverage}%; surfaced=${play.surfaced}`,
   );
   lines.push(`Engine-recommended instrument: ${play.instrument}`);
   if (play.fatigueWarning) lines.push(`Fatigue note: ${play.fatigueWarning}`);

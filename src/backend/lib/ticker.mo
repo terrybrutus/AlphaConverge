@@ -1,5 +1,7 @@
 import Map "mo:core/Map";
 import List "mo:core/List";
+import Principal "mo:core/Principal";
+import Text "mo:core/Text";
 import Types "../types/ticker";
 
 module {
@@ -271,20 +273,47 @@ module {
     };
   };
 
-  public func upsert(tickers : Map.Map<Text, Types.Ticker>, ticker : Types.Ticker) : () {
-    tickers.add(ticker.symbol, ticker);
-  };
-
-  public func getWatchlist(watchlist : List.List<Text>) : [Text] {
-    watchlist.toArray();
-  };
-
-  public func addToWatchlist(watchlist : List.List<Text>, symbol : Text) : () {
-    // List has no direct iterator field; convert to an array first (arrays
-    // expose `.vals()`), matching how the rest of the codebase iterates Lists.
-    for (s in watchlist.toArray().vals()) {
-      if (s == symbol) { return };
+  public func getWatchlist(
+    userWatchlists : Map.Map<Principal, List.List<Text>>,
+    caller : Principal,
+  ) : [Text] {
+    switch (userWatchlists.get(caller)) {
+      case (?watchlist) { watchlist.toArray() };
+      case null { [] };
     };
-    watchlist.add(symbol);
+  };
+
+  public func setWatchlist(
+    userWatchlists : Map.Map<Principal, List.List<Text>>,
+    caller : Principal,
+    symbols : [Text],
+  ) : () {
+    assert symbols.size() <= 100;
+    let watchlist = List.empty<Text>();
+    for (symbol in symbols.vals()) {
+      assert Text.size(symbol) > 0 and Text.size(symbol) <= 12;
+      var duplicate = false;
+      for (existing in watchlist.toArray().vals()) {
+        if (existing == symbol) { duplicate := true };
+      };
+      if (not duplicate) { watchlist.add(symbol) };
+    };
+    switch (userWatchlists.get(caller)) {
+      case (?existing) {
+        let old = existing.toArray();
+        let next = watchlist.toArray();
+        if (old.size() == next.size()) {
+          var same = true;
+          var i = 0;
+          while (i < old.size()) {
+            if (old[i] != next[i]) { same := false };
+            i += 1;
+          };
+          if (same) { return };
+        };
+      };
+      case null {};
+    };
+    userWatchlists.add(caller, watchlist);
   };
 };

@@ -114,8 +114,8 @@ export function AiRead({ play }: { play: Play }) {
           </div>
           <p className="text-xs text-muted-foreground">
             Generates a plain-language read of the converged signals using
-            Claude Haiku (cheap, runs only when you click). Your key is stored
-            in this browser and sent directly to Anthropic — use a personal key.
+            Claude Haiku (cheap, runs only when you click). Your key stays in
+            memory for this session and is sent directly to Anthropic.
           </p>
         </form>
       ) : note?.status === "error" ? (
