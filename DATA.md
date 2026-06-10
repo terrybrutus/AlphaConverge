@@ -5,6 +5,29 @@ engine and UI are fully navigable. Nothing in the app is presented as live
 market truth until you connect real sources. This document is the checklist for
 that wiring.
 
+## Status — what is already live
+
+- **Technical category is real.** Add any US ticker under **Live tickers** on
+  the Screener (with a free Alpha Vantage key) and the app fetches weekly
+  candles and computes the technical signals — RSI bullish divergence
+  (weekly + monthly), base formation, first higher high, % above 52-week low,
+  volume contraction, support proximity — in
+  `src/frontend/src/lib/technicals.ts`. Stage classification and the instrument
+  recommendation then run on real structure.
+- **Honest by construction.** A live ticker only has data for the Technical
+  category; the other four are shown as **“no source connected”** and cannot
+  count toward convergence, so a live ticker won’t surface on technicals alone.
+  Sample tickers remain badged **Preview**.
+- **Architecture decision.** Public market data is fetched **browser-side**
+  (per the project’s original design), not via canister HTTP outcalls — this
+  avoids the ICP consensus problem for non-deterministic API responses and
+  needs no cycles. The canister is reserved for watchlist/history persistence.
+  Files: `lib/providers/` (provider interface + Alpha Vantage), `lib/liveTicker.ts`
+  (candles → scorable ticker), `lib/liveStore.ts` (key + symbols + fetch state).
+
+Each remaining category below becomes real by adding a provider that fills its
+fields and flipping its `availability` flag in `buildLiveTicker`.
+
 ## Architecture (how data reaches the engine)
 
 ```

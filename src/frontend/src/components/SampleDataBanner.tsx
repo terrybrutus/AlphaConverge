@@ -12,12 +12,13 @@ export function SampleDataBanner() {
       <FlaskConical className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
       <div className="text-sm">
         <p className="font-semibold text-accent">
-          Preview data — no live provider connected
+          Sample setups below — illustrative, not market data
         </p>
         <p className="text-accent/80 leading-snug mt-0.5">
-          These setups are illustrative inputs used to demonstrate the
-          convergence engine. They are not real market data. Wire the sources in{" "}
-          <span className="font-mono">DATA.md</span> to score the live market.
+          The plays in this section are fabricated inputs that demonstrate the
+          convergence engine across every stage. For real analysis, add tickers
+          to <strong>Live tickers</strong> above. Full multi-category live data
+          is wired per <span className="font-mono">DATA.md</span>.
         </p>
       </div>
     </div>

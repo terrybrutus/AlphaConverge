@@ -1,5 +1,5 @@
 import type { CategoryResult } from "@/types/ticker";
-import { Check, Minus } from "lucide-react";
+import { Check, Minus, PlugZap } from "lucide-react";
 
 function scoreTone(score: number): string {
   if (score >= 75) return "text-primary";
@@ -9,6 +9,30 @@ function scoreTone(score: number): string {
 }
 
 export function CategoryBreakdown({ category }: { category: CategoryResult }) {
+  // No live data source connected for this category — show it honestly as
+  // unscored rather than a misleading zero.
+  if (!category.available) {
+    return (
+      <div
+        className="bg-card border border-dashed border-border rounded-xl p-4 opacity-80"
+        data-ocid={`category.${category.key}`}
+      >
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-display text-base font-semibold text-muted-foreground">
+            {category.label}
+          </h3>
+          <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wide text-muted-foreground">
+            <PlugZap className="h-3 w-3" /> No source
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground leading-snug">
+          No live data source is connected for this category yet, so it is not
+          scored and cannot count toward convergence. See DATA.md to wire it.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div
       className="bg-card border border-border rounded-xl p-4"

@@ -3,7 +3,7 @@ import { StageBadge } from "@/components/StageBadge";
 import { INSTRUMENT_LABEL } from "@/lib/convergence";
 import type { Play } from "@/types/ticker";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, FlaskConical, Target } from "lucide-react";
+import { AlertTriangle, FlaskConical, Radio, Target } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer } from "recharts";
 
 export function PlayCard({ play, rank }: { play: Play; rank: number }) {
@@ -26,15 +26,25 @@ export function PlayCard({ play, rank }: { play: Play; rank: number }) {
                 {play.symbol}
               </span>
               <StageBadge stage={play.stage} />
-              {play.sample && (
+              {play.sample ? (
                 <span className="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/10 px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wide text-accent">
                   <FlaskConical className="w-3 h-3" /> Preview
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wide text-primary">
+                  <Radio className="w-3 h-3" /> Live
                 </span>
               )}
             </div>
             <p className="text-sm text-muted-foreground truncate">
               {play.name} · {play.sector}
             </p>
+            {!play.sample && (
+              <p className="text-[11px] text-muted-foreground/80 mt-0.5">
+                {play.categoriesWithData} of 5 categories sourced
+                {play.source ? ` · ${play.source}` : ""}
+              </p>
+            )}
             <p className="mt-1 font-mono text-lg font-semibold text-foreground">
               ${play.price.toFixed(2)}
             </p>

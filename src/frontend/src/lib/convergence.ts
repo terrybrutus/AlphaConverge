@@ -31,16 +31,40 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
+function isAvailable(t: TickerRaw, key: CategoryKey): boolean {
+  return t.availability?.[key] ?? true;
+}
+
 function scoreCategory(
   key: CategoryKey,
   label: string,
   signals: SignalLine[],
+  available: boolean,
 ): CategoryResult {
+  if (!available) {
+    // No data source connected for this category — score it as unknown, never
+    // fabricate a signal.
+    return {
+      key,
+      label,
+      score: 0,
+      aligned: false,
+      available: false,
+      signals: signals.map((s) => ({ ...s, fired: false })),
+    };
+  }
   const totalWeight = signals.reduce((s, x) => s + x.weight, 0);
   const firedWeight = signals.reduce((s, x) => s + (x.fired ? x.weight : 0), 0);
   const score =
     totalWeight === 0 ? 0 : Math.round((firedWeight / totalWeight) * 100);
-  return { key, label, score, aligned: score >= ALIGN_THRESHOLD, signals };
+  return {
+    key,
+    label,
+    score,
+    aligned: score >= ALIGN_THRESHOLD,
+    available: true,
+    signals,
+  };
 }
 
 function technical(t: TickerRaw): CategoryResult {
@@ -83,7 +107,12 @@ function technical(t: TickerRaw): CategoryResult {
       fired: t.nearMajorSupport,
     },
   ];
-  return scoreCategory("technical", "Technical structure", signals);
+  return scoreCategory(
+    "technical",
+    "Technical structure",
+    signals,
+    isAvailable(t, "technical"),
+  );
 }
 
 function fundamental(t: TickerRaw): CategoryResult {
@@ -133,7 +162,12 @@ function fundamental(t: TickerRaw): CategoryResult {
       fired: t.instOwnershipChange > 0.5,
     },
   ];
-  return scoreCategory("fundamental", "Fundamental inflection", signals);
+  return scoreCategory(
+    "fundamental",
+    "Fundamental inflection",
+    signals,
+    isAvailable(t, "fundamental"),
+  );
 }
 
 function microstructure(t: TickerRaw): CategoryResult {
@@ -168,7 +202,12 @@ function microstructure(t: TickerRaw): CategoryResult {
       fired: t.putCallShift < -0.2,
     },
   ];
-  return scoreCategory("microstructure", "Market microstructure", signals);
+  return scoreCategory(
+    "microstructure",
+    "Market microstructure",
+    signals,
+    isAvailable(t, "microstructure"),
+  );
 }
 
 function sentiment(t: TickerRaw): CategoryResult {
@@ -200,7 +239,12 @@ function sentiment(t: TickerRaw): CategoryResult {
       fired: t.googleTrendsSlope > 0.15,
     },
   ];
-  return scoreCategory("sentiment", "Sentiment", signals);
+  return scoreCategory(
+    "sentiment",
+    "Sentiment",
+    signals,
+    isAvailable(t, "sentiment"),
+  );
 }
 
 function macro(t: TickerRaw): CategoryResult {
@@ -227,7 +271,12 @@ function macro(t: TickerRaw): CategoryResult {
       fired: t.sectorNarrative,
     },
   ];
-  return scoreCategory("macro", "Macro & sector", signals);
+  return scoreCategory(
+    "macro",
+    "Macro & sector",
+    signals,
+    isAvailable(t, "macro"),
+  );
 }
 
 function classifyStage(t: TickerRaw): Stage {
@@ -394,6 +443,8 @@ export function scoreTicker(t: TickerRaw): Play {
     fatigueWarning: buildFatigueWarning(stage, t),
     surfaced,
     sample: t.sample,
+    source: t.source,
+    categoriesWithData: categories.filter((c) => c.available).length,
   };
 }
 

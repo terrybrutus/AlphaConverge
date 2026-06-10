@@ -4,16 +4,19 @@ import { StageBadge } from "@/components/StageBadge";
 import { Button } from "@/components/ui/button";
 import { SAMPLE_UNIVERSE } from "@/data/sampleUniverse";
 import { INSTRUMENT_LABEL, scoreTicker } from "@/lib/convergence";
+import { useLiveStore } from "@/lib/liveStore";
 import { Link, useParams } from "@tanstack/react-router";
 import {
   AlertTriangle,
   ArrowLeft,
   BarChart2,
   FlaskConical,
+  Loader2,
+  Radio,
   Target,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import {
   Area,
   AreaChart,
@@ -26,18 +29,49 @@ import {
 
 export function TickerDetailPage() {
   const { symbol } = useParams({ from: "/ticker/$symbol" });
-  const play = useMemo(() => {
-    const raw = SAMPLE_UNIVERSE.find((t) => t.symbol === symbol?.toUpperCase());
+  const sym = symbol?.toUpperCase() ?? "";
+
+  const liveEntry = useLiveStore((s) => s.entries[sym]);
+  const isLiveSymbol = useLiveStore((s) => s.symbols.includes(sym));
+  const apiKey = useLiveStore((s) => s.apiKey);
+  const refreshOne = useLiveStore((s) => s.refreshOne);
+
+  // If we arrived directly at a live ticker that hasn't been fetched (e.g. page
+  // refresh), fetch it.
+  useEffect(() => {
+    if (isLiveSymbol && !liveEntry && apiKey) void refreshOne(sym);
+  }, [isLiveSymbol, liveEntry, apiKey, sym, refreshOne]);
+
+  const samplePlay = useMemo(() => {
+    const raw = SAMPLE_UNIVERSE.find((t) => t.symbol === sym);
     return raw ? scoreTicker(raw) : null;
-  }, [symbol]);
+  }, [sym]);
+
+  const play = liveEntry?.play ?? samplePlay;
 
   if (!play) {
+    const loading = isLiveSymbol && liveEntry?.status !== "error";
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
-        <p className="text-xl text-muted-foreground">
-          Ticker <span className="text-foreground font-mono">{symbol}</span> not
-          in the current universe
-        </p>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 px-4 text-center">
+        {loading ? (
+          <p className="text-xl text-muted-foreground flex items-center gap-2">
+            <Loader2 className="w-5 h-5 animate-spin" /> Fetching live data for{" "}
+            <span className="text-foreground font-mono">{sym}</span>…
+          </p>
+        ) : (
+          <p className="text-xl text-muted-foreground">
+            {liveEntry?.status === "error" ? (
+              <>
+                Couldn’t load {sym}: {liveEntry.error}
+              </>
+            ) : (
+              <>
+                Ticker <span className="text-foreground font-mono">{sym}</span>{" "}
+                not in the current universe
+              </>
+            )}
+          </p>
+        )}
         <Link to="/">
           <Button variant="outline">
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Screener
@@ -74,15 +108,25 @@ export function TickerDetailPage() {
                   {play.symbol}
                 </span>
                 <StageBadge stage={play.stage} />
-                {play.sample && (
+                {play.sample ? (
                   <span className="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/10 px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wide text-accent">
                     <FlaskConical className="w-3 h-3" /> Preview
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wide text-primary">
+                    <Radio className="w-3 h-3" /> Live
                   </span>
                 )}
               </div>
               <p className="text-muted-foreground text-base">
                 {play.name} · {play.sector}
               </p>
+              {!play.sample && (
+                <p className="text-xs text-muted-foreground/80 mt-0.5">
+                  {play.categoriesWithData} of 5 categories sourced
+                  {play.source ? ` · ${play.source}` : ""}
+                </p>
+              )}
               <p className="mt-2 font-mono text-3xl font-bold text-foreground">
                 ${play.price.toFixed(2)}
               </p>
