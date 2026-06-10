@@ -35,7 +35,7 @@ const PRICE_PROVIDERS: Record<
 };
 
 export function LivePanel() {
-  const apiKey = useLiveStore((s) => s.apiKey);
+  const apiKey = useLiveStore((s) => s.priceKeys[s.priceProvider]);
   const finnhubKey = useLiveStore((s) => s.finnhubKey);
   const priceProvider = useLiveStore((s) => s.priceProvider);
   const symbols = useLiveStore((s) => s.symbols);
@@ -117,8 +117,9 @@ export function LivePanel() {
             <button
               key={id}
               type="button"
+              disabled={scanning}
               onClick={() => setPriceProvider(id)}
-              className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-40 ${
                 priceProvider === id
                   ? "border-primary/50 bg-primary/15 text-foreground"
                   : "border-border bg-muted/40 text-muted-foreground hover:text-foreground"

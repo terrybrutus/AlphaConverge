@@ -483,13 +483,24 @@ export function scoreTicker(t: TickerRaw): Play {
   const dimensionsAligned = categoriesAlignedCount + (stageValid ? 1 : 0);
   const surfaced = dimensionsAligned >= SURFACE_MIN_DIMENSIONS;
 
-  const convergenceScore = Math.round(
-    clamp(
-      categories.reduce((sum, c) => sum + c.score * CATEGORY_BLEND[c.key], 0),
-      0,
-      100,
-    ),
-  );
+  // Score only the categories that actually have data, renormalizing their
+  // weights — so "no data" categories don't drag the number down. Coverage is
+  // communicated separately via dimensions aligned (X/6).
+  const availCats = categories.filter((c) => c.available);
+  const weightSum = availCats.reduce((s, c) => s + CATEGORY_BLEND[c.key], 0);
+  const convergenceScore =
+    weightSum > 0
+      ? Math.round(
+          clamp(
+            availCats.reduce(
+              (sum, c) => sum + c.score * CATEGORY_BLEND[c.key],
+              0,
+            ) / weightSum,
+            0,
+            100,
+          ),
+        )
+      : 0;
 
   const { instrument, rationale } = chooseInstrument(stage, t, surfaced);
 

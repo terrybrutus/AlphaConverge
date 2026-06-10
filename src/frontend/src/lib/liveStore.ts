@@ -43,7 +43,7 @@ export interface BacktestState {
 }
 
 interface LiveState {
-  apiKey: string; // price key (for the selected price provider)
+  priceKeys: Record<PriceProvider, string>; // a separate key per price provider
   finnhubKey: string; // Finnhub (fundamentals + sentiment) — optional
   aiKey: string; // Anthropic (AI read) — optional
   priceProvider: PriceProvider;
@@ -51,7 +51,7 @@ interface LiveState {
   entries: Record<string, LiveEntry>;
   aiNotes: Record<string, AiNote>;
   backtest: BacktestState;
-  setApiKey: (key: string) => void;
+  setApiKey: (key: string) => void; // sets the key for the CURRENT provider
   setFinnhubKey: (key: string) => void;
   setAiKey: (key: string) => void;
   setPriceProvider: (p: PriceProvider) => void;
@@ -79,7 +79,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const useLiveStore = create<LiveState>()(
   persist(
     (set, get) => ({
-      apiKey: "",
+      priceKeys: { alphaVantage: "", twelveData: "" },
       finnhubKey: "",
       aiKey: "",
       priceProvider: "alphaVantage",
@@ -88,7 +88,10 @@ export const useLiveStore = create<LiveState>()(
       aiNotes: {},
       backtest: { status: "idle", progress: { done: 0, total: 0 } },
 
-      setApiKey: (key) => set({ apiKey: key.trim() }),
+      setApiKey: (key) =>
+        set((s) => ({
+          priceKeys: { ...s.priceKeys, [s.priceProvider]: key.trim() },
+        })),
       setFinnhubKey: (key) => set({ finnhubKey: key.trim() }),
       setAiKey: (key) => set({ aiKey: key.trim() }),
       setPriceProvider: (p) => set({ priceProvider: p }),
@@ -161,7 +164,8 @@ export const useLiveStore = create<LiveState>()(
         }),
 
       refreshOne: async (symbol) => {
-        const { apiKey, priceProvider } = get();
+        const { priceProvider } = get();
+        const apiKey = get().priceKeys[priceProvider];
         const provider = priceProviderFor(priceProvider);
         if (!apiKey) {
           set((s) => ({
@@ -254,7 +258,8 @@ export const useLiveStore = create<LiveState>()(
       },
 
       runBacktest: async ({ horizon, symbols }) => {
-        const { apiKey, priceProvider } = get();
+        const { priceProvider } = get();
+        const apiKey = get().priceKeys[priceProvider];
         const provider = priceProviderFor(priceProvider);
         if (!apiKey) {
           set({
@@ -310,8 +315,18 @@ export const useLiveStore = create<LiveState>()(
     }),
     {
       name: "alphaconverge-live",
+      version: 1,
+      // v0 used a single `apiKey` shared across providers — migrate it onto the
+      // Alpha Vantage slot so existing users don't lose their saved key.
+      migrate: (persisted: unknown, version: number) => {
+        const p = (persisted ?? {}) as Record<string, unknown>;
+        if (version < 1 && typeof p.apiKey === "string") {
+          p.priceKeys = { alphaVantage: p.apiKey, twelveData: "" };
+        }
+        return p as unknown as LiveState;
+      },
       partialize: (s) => ({
-        apiKey: s.apiKey,
+        priceKeys: s.priceKeys,
         finnhubKey: s.finnhubKey,
         aiKey: s.aiKey,
         priceProvider: s.priceProvider,
