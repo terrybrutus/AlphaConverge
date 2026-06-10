@@ -291,7 +291,7 @@ module {
     assert symbols.size() <= 100;
     let watchlist = List.empty<Text>();
     for (symbol in symbols.vals()) {
-      assert Text.size(symbol) > 0 and Text.size(symbol) <= 12;
+      assert symbol.size() > 0 and symbol.size() <= 12;
       var duplicate = false;
       for (existing in watchlist.toArray().vals()) {
         if (existing == symbol) { duplicate := true };
