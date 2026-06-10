@@ -62,6 +62,12 @@ worker), not browser fetches.
   Benchmark candles are cached across a scan. Sector narrative has no free
   deterministic source → "no data". With four wired categories a live ticker
   can now reach **5/6** dimensions.
+- **Microstructure category is partially real** for free. **Volume accumulation**
+  (On-Balance-Volume trending up) is computed from the price candles you already
+  fetch — a real "are buyers quietly accumulating" signal, no extra API. Unusual
+  options activity, short-squeeze fuel (short interest), dark-pool prints, and
+  put/call shifts need **paid** feeds, so they're marked "no data". With this, a
+  live ticker can reach the full **6/6** dimensions.
 - **AI read (optional).** On any ticker's detail page, an on-click **AI read**
   (`lib/ai/analyze.ts`) sends the engine's computed signals to **Claude Haiku
   4.5** and returns a plain-language thesis + bull/bear case + what would

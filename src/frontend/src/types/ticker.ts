@@ -28,6 +28,7 @@ export interface TickerRaw {
   unusualCallActivity: boolean;
   darkPoolAccumulation: boolean;
   putCallShift: number; // -1..1, negative = calls favored
+  obvRising: boolean; // On-Balance-Volume trending up (volume accumulation)
 
   // 4. Sentiment
   redditMentionVelocity: number; // z-score

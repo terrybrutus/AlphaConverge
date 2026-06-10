@@ -23,6 +23,7 @@ export interface TechnicalFacts {
   monthlyBullishDivergence: boolean;
   firstHigherHigh: boolean;
   nearMajorSupport: boolean;
+  obvRising: boolean;
 }
 
 // Wilder's RSI. Returns an array aligned to `closes` (first `period` entries
@@ -163,7 +164,26 @@ export function computeTechnicals(weekly: Candle[]): TechnicalFacts {
     })(),
     firstHigherHigh,
     nearMajorSupport,
+    obvRising: obvTrendUp(weekly),
   };
+}
+
+// On-Balance-Volume: cumulative volume that adds on up-weeks and subtracts on
+// down-weeks. A rising OBV means volume is flowing into advances — accumulation.
+// We flag "rising" when OBV's last value exceeds its value ~12 weeks earlier.
+function obvTrendUp(weekly: Candle[]): boolean {
+  if (weekly.length < 14) return false;
+  const obv: number[] = [0];
+  for (let i = 1; i < weekly.length; i++) {
+    const prev = obv[i - 1];
+    if (weekly[i].close > weekly[i - 1].close)
+      obv.push(prev + weekly[i].volume);
+    else if (weekly[i].close < weekly[i - 1].close)
+      obv.push(prev - weekly[i].volume);
+    else obv.push(prev);
+  }
+  const lookback = Math.min(12, obv.length - 1);
+  return obv[obv.length - 1] > obv[obv.length - 1 - lookback];
 }
 
 function avg(xs: number[]): number {
