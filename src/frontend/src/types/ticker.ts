@@ -45,6 +45,15 @@ export interface TickerRaw {
 
   // Provenance: true => illustrative preview, not from a live provider
   sample: boolean;
+
+  // Which signal categories actually have data behind them. Omitted => all
+  // available (the sample path). A live ticker with only price data sets
+  // technical: true and the rest false, so unconnected categories are scored
+  // as "no data" rather than faked.
+  availability?: Partial<Record<CategoryKey, boolean>>;
+
+  // Where the data came from, e.g. "Alpha Vantage" or "Preview".
+  source?: string;
 }
 
 export type CategoryKey =
@@ -82,6 +91,7 @@ export interface CategoryResult {
   label: string;
   score: number; // 0..100
   aligned: boolean; // counts toward convergence
+  available: boolean; // false => no data source connected for this category
   signals: SignalLine[];
 }
 
@@ -101,4 +111,6 @@ export interface Play {
   fatigueWarning: string | null;
   surfaced: boolean; // >= 4 categories aligned
   sample: boolean;
+  source?: string; // where the underlying data came from
+  categoriesWithData: number; // how many of the 5 categories have a live source
 }

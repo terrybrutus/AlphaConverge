@@ -19,6 +19,20 @@
 - `src/frontend/src/data/sampleUniverse.ts` — labeled preview universe (fallback)
 - `src/frontend/src/components/PlayCard.tsx` — the centerpiece UI artifact
 - `src/frontend/src/pages/ScreenerPage.tsx` / `TickerDetailPage.tsx` — the two views
+- `src/frontend/src/lib/technicals.ts` — REAL technical analysis from OHLCV (RSI/divergence/base/HH)
+- `src/frontend/src/lib/providers/` — market-data provider interface + Alpha Vantage (browser-side)
+- `src/frontend/src/lib/liveTicker.ts` — builds a scorable ticker from real candles
+- `src/frontend/src/lib/liveStore.ts` — zustand store: API key + live symbols + fetch state
+
+## Live data status
+
+- **Technical is live** for any ticker added under "Live tickers" (free Alpha
+  Vantage key, browser-side fetch). The other four categories are honestly
+  marked "no source connected" via `TickerRaw.availability` until their
+  providers are wired — they never fabricate signals.
+- Market data is fetched **browser-side** (not via canister HTTP outcalls) to
+  avoid ICP consensus issues with non-deterministic API responses. The canister
+  is for watchlist/history persistence.
 
 ## Honesty constraints (do not violate)
 

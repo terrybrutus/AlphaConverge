@@ -1,3 +1,4 @@
+import { LivePanel } from "@/components/LivePanel";
 import { PlayCard } from "@/components/PlayCard";
 import { SampleDataBanner } from "@/components/SampleDataBanner";
 import { SearchInput } from "@/components/SearchInput";
@@ -88,6 +89,8 @@ export function ScreenerPage() {
       </div>
 
       <div className="px-4 md:px-8 py-8 max-w-7xl mx-auto space-y-6">
+        <LivePanel />
+
         {isSample && <SampleDataBanner />}
 
         <div className="flex items-center justify-between">
