@@ -1,4 +1,10 @@
 import { analyzePlay } from "@/lib/ai/analyze";
+import {
+  type BtResult,
+  type BtSample,
+  aggregate,
+  backtestCandles,
+} from "@/lib/backtest";
 import { scoreTicker } from "@/lib/convergence";
 import { buildLiveTicker } from "@/lib/liveTicker";
 import { type MacroFacts, fetchMacro } from "@/lib/macro";
@@ -29,6 +35,13 @@ export interface AiNote {
 
 export type PriceProvider = "alphaVantage" | "twelveData";
 
+export interface BacktestState {
+  status: "idle" | "running" | "done" | "error";
+  progress: { done: number; total: number };
+  error?: string;
+  result?: BtResult;
+}
+
 interface LiveState {
   apiKey: string; // price key (for the selected price provider)
   finnhubKey: string; // Finnhub (fundamentals + sentiment) — optional
@@ -37,6 +50,7 @@ interface LiveState {
   symbols: string[];
   entries: Record<string, LiveEntry>;
   aiNotes: Record<string, AiNote>;
+  backtest: BacktestState;
   setApiKey: (key: string) => void;
   setFinnhubKey: (key: string) => void;
   setAiKey: (key: string) => void;
@@ -47,6 +61,7 @@ interface LiveState {
   refreshOne: (symbol: string) => Promise<void>;
   refreshAll: () => Promise<void>;
   analyze: (play: Play) => Promise<void>;
+  runBacktest: (opts: { horizon: number; symbols: string[] }) => Promise<void>;
 }
 
 function priceProviderFor(p: PriceProvider) {
@@ -71,6 +86,7 @@ export const useLiveStore = create<LiveState>()(
       symbols: [],
       entries: {},
       aiNotes: {},
+      backtest: { status: "idle", progress: { done: 0, total: 0 } },
 
       setApiKey: (key) => set({ apiKey: key.trim() }),
       setFinnhubKey: (key) => set({ finnhubKey: key.trim() }),
@@ -235,6 +251,61 @@ export const useLiveStore = create<LiveState>()(
           await get().refreshOne(symbols[i]);
           if (i < symbols.length - 1) await sleep(delay);
         }
+      },
+
+      runBacktest: async ({ horizon, symbols }) => {
+        const { apiKey, priceProvider } = get();
+        const provider = priceProviderFor(priceProvider);
+        if (!apiKey) {
+          set({
+            backtest: {
+              status: "error",
+              progress: { done: 0, total: 0 },
+              error: `Add your ${provider.name} API key first.`,
+            },
+          });
+          return;
+        }
+        if (symbols.length === 0) {
+          set({
+            backtest: {
+              status: "error",
+              progress: { done: 0, total: 0 },
+              error: "No tickers to backtest.",
+            },
+          });
+          return;
+        }
+        set({
+          backtest: {
+            status: "running",
+            progress: { done: 0, total: symbols.length },
+          },
+        });
+        const delay = scanDelayMs(priceProvider);
+        const samples: BtSample[] = [];
+        for (let i = 0; i < symbols.length; i++) {
+          try {
+            const candles = await provider.weeklyCandles(symbols[i], apiKey);
+            samples.push(...backtestCandles(symbols[i], candles, horizon));
+          } catch {
+            // skip tickers that fail / rate-limit; the run continues
+          }
+          set((s) => ({
+            backtest: {
+              ...s.backtest,
+              progress: { done: i + 1, total: symbols.length },
+            },
+          }));
+          if (i < symbols.length - 1) await sleep(delay);
+        }
+        set({
+          backtest: {
+            status: "done",
+            progress: { done: symbols.length, total: symbols.length },
+            result: aggregate(samples, horizon),
+          },
+        });
       },
     }),
     {
