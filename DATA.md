@@ -5,6 +5,20 @@ engine and UI are fully navigable. Nothing in the app is presented as live
 market truth until you connect real sources. This document is the checklist for
 that wiring.
 
+## Discovery — finding candidates without typing symbols
+
+The Screener auto-ranks whatever universe it scores. For the sample set that's
+automatic; for live data you either add symbols or hit **Load & scan starter
+set** in the Live panel — a curated ~24-name universe the engine scores and
+splits into **Surfaced** (4+ dimensions) vs **Scanned** (ranked, not yet a
+setup). Pick the **price source** in the panel: Alpha Vantage (~25/day — fine
+for a few names) or **Twelve Data** (~800/day, 8/min — enough to scan the set).
+Scans are paced to the provider's per-minute limit.
+
+True whole-market nightly scanning (all ~8,000 US equities) is still the
+big-ticket item: it needs paid data + a scheduled backend (canister timer or a
+worker), not browser fetches.
+
 ## Status — what is already live
 
 - **Technical category is real.** Add any US ticker under **Live tickers** on

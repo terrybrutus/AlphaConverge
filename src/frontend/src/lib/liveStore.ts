@@ -8,6 +8,7 @@ import {
   fetchFundamentals,
   fetchSentiment,
 } from "@/lib/providers/finnhub";
+import { twelveDataProvider } from "@/lib/providers/twelveData";
 import type { Play } from "@/types/ticker";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
@@ -24,24 +25,39 @@ export interface AiNote {
   error?: string;
 }
 
+export type PriceProvider = "alphaVantage" | "twelveData";
+
 interface LiveState {
-  apiKey: string; // Alpha Vantage (price/technical)
-  finnhubKey: string; // Finnhub (fundamentals) — optional
+  apiKey: string; // price key (for the selected price provider)
+  finnhubKey: string; // Finnhub (fundamentals + sentiment) — optional
   aiKey: string; // Anthropic (AI read) — optional
+  priceProvider: PriceProvider;
   symbols: string[];
   entries: Record<string, LiveEntry>;
   aiNotes: Record<string, AiNote>;
   setApiKey: (key: string) => void;
   setFinnhubKey: (key: string) => void;
   setAiKey: (key: string) => void;
+  setPriceProvider: (p: PriceProvider) => void;
   addSymbol: (symbol: string) => void;
+  loadSymbols: (symbols: string[]) => Promise<void>;
   removeSymbol: (symbol: string) => void;
   refreshOne: (symbol: string) => Promise<void>;
   refreshAll: () => Promise<void>;
   analyze: (play: Play) => Promise<void>;
 }
 
-const provider = alphaVantageProvider;
+function priceProviderFor(p: PriceProvider) {
+  return p === "twelveData" ? twelveDataProvider : alphaVantageProvider;
+}
+
+// Pacing between tickers during a batch scan, tuned to each free tier's
+// per-minute ceiling (Twelve Data: 8/min).
+function scanDelayMs(p: PriceProvider): number {
+  return p === "twelveData" ? 8000 : 1500;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export const useLiveStore = create<LiveState>()(
   persist(
@@ -49,6 +65,7 @@ export const useLiveStore = create<LiveState>()(
       apiKey: "",
       finnhubKey: "",
       aiKey: "",
+      priceProvider: "alphaVantage",
       symbols: [],
       entries: {},
       aiNotes: {},
@@ -56,6 +73,7 @@ export const useLiveStore = create<LiveState>()(
       setApiKey: (key) => set({ apiKey: key.trim() }),
       setFinnhubKey: (key) => set({ finnhubKey: key.trim() }),
       setAiKey: (key) => set({ aiKey: key.trim() }),
+      setPriceProvider: (p) => set({ priceProvider: p }),
 
       analyze: async (play) => {
         const { aiKey } = get();
@@ -101,6 +119,19 @@ export const useLiveStore = create<LiveState>()(
         void get().refreshOne(symbol);
       },
 
+      // Add many symbols (e.g. the starter universe) without firing a fetch per
+      // symbol, then scan them sequentially with pacing.
+      loadSymbols: async (raw) => {
+        const incoming = raw.map((s) => s.trim().toUpperCase()).filter(Boolean);
+        set((s) => {
+          const merged = [...s.symbols];
+          for (const sym of incoming)
+            if (!merged.includes(sym)) merged.push(sym);
+          return { symbols: merged };
+        });
+        await get().refreshAll();
+      },
+
       removeSymbol: (symbol) =>
         set((s) => {
           const entries = { ...s.entries };
@@ -112,14 +143,15 @@ export const useLiveStore = create<LiveState>()(
         }),
 
       refreshOne: async (symbol) => {
-        const { apiKey } = get();
+        const { apiKey, priceProvider } = get();
+        const provider = priceProviderFor(priceProvider);
         if (!apiKey) {
           set((s) => ({
             entries: {
               ...s.entries,
               [symbol]: {
                 status: "error",
-                error: "Add your Alpha Vantage API key first.",
+                error: `Add your ${provider.name} API key first.`,
               },
             },
           }));
@@ -173,9 +205,12 @@ export const useLiveStore = create<LiveState>()(
       },
 
       refreshAll: async () => {
-        // Sequential to respect free-tier rate limits.
-        for (const symbol of get().symbols) {
-          await get().refreshOne(symbol);
+        // Sequential, paced to the price provider's per-minute limit.
+        const delay = scanDelayMs(get().priceProvider);
+        const symbols = get().symbols;
+        for (let i = 0; i < symbols.length; i++) {
+          await get().refreshOne(symbols[i]);
+          if (i < symbols.length - 1) await sleep(delay);
         }
       },
     }),
@@ -185,6 +220,7 @@ export const useLiveStore = create<LiveState>()(
         apiKey: s.apiKey,
         finnhubKey: s.finnhubKey,
         aiKey: s.aiKey,
+        priceProvider: s.priceProvider,
         symbols: s.symbols,
       }),
     },

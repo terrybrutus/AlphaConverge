@@ -1,26 +1,50 @@
 import { PlayCard } from "@/components/PlayCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useLiveStore } from "@/lib/liveStore";
+import { STARTER_UNIVERSE } from "@/data/starterUniverse";
+import { type PriceProvider, useLiveStore } from "@/lib/liveStore";
+import type { Play } from "@/types/ticker";
 import {
   KeyRound,
   Loader2,
   Plus,
   Radio,
   RefreshCw,
+  Telescope,
   TriangleAlert,
   X,
 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 
+const PRICE_PROVIDERS: Record<
+  PriceProvider,
+  { label: string; keyLabel: string; signupUrl: string; note: string }
+> = {
+  alphaVantage: {
+    label: "Alpha Vantage",
+    keyLabel: "Alpha Vantage API key",
+    signupUrl: "https://www.alphavantage.co/support/#api-key",
+    note: "Free tier ~25 requests/day — fine for a few names, too small to scan a set.",
+  },
+  twelveData: {
+    label: "Twelve Data",
+    keyLabel: "Twelve Data API key",
+    signupUrl: "https://twelvedata.com/pricing",
+    note: "Free tier ~800/day, 8/min — high enough to scan the starter set.",
+  },
+};
+
 export function LivePanel() {
   const apiKey = useLiveStore((s) => s.apiKey);
   const finnhubKey = useLiveStore((s) => s.finnhubKey);
+  const priceProvider = useLiveStore((s) => s.priceProvider);
   const symbols = useLiveStore((s) => s.symbols);
   const entries = useLiveStore((s) => s.entries);
   const setApiKey = useLiveStore((s) => s.setApiKey);
   const setFinnhubKey = useLiveStore((s) => s.setFinnhubKey);
+  const setPriceProvider = useLiveStore((s) => s.setPriceProvider);
   const addSymbol = useLiveStore((s) => s.addSymbol);
+  const loadSymbols = useLiveStore((s) => s.loadSymbols);
   const removeSymbol = useLiveStore((s) => s.removeSymbol);
   const refreshAll = useLiveStore((s) => s.refreshAll);
 
@@ -31,6 +55,16 @@ export function LivePanel() {
   const [symbolDraft, setSymbolDraft] = useState("");
 
   const hasKey = apiKey.length > 0;
+  const pp = PRICE_PROVIDERS[priceProvider];
+  const scanning = symbols.some((s) => entries[s]?.status === "loading");
+
+  // Ranked live results — highest convergence first, surfaced split out.
+  const livePlays = symbols
+    .map((sym) => entries[sym]?.play)
+    .filter((p): p is Play => !!p)
+    .sort((a, b) => b.convergenceScore - a.convergenceScore);
+  const liveSurfaced = livePlays.filter((p) => p.surfaced);
+  const liveWatch = livePlays.filter((p) => !p.surfaced);
 
   const submitKey = (e: FormEvent) => {
     e.preventDefault();
@@ -66,12 +100,35 @@ export function LivePanel() {
         </h2>
       </div>
       <p className="text-sm text-muted-foreground mb-4">
-        Add any US ticker to score it on <strong>real</strong> data. Technical
-        is computed live from price; add a Finnhub key to also source
-        Fundamentals (insider buys, revenue accel) and Sentiment (news
-        headlines, analyst trend). Remaining categories show as “no source”
-        until their providers are wired (DATA.md).
+        Score any US ticker on <strong>real</strong> data, or load the starter
+        set and let the engine surface what converges. Technical is computed
+        live from price; add a Finnhub key to also source Fundamentals (insider
+        buys, revenue accel) and Sentiment (news, analyst trend).
       </p>
+
+      {/* Price source */}
+      <div className="mb-4">
+        <span className="text-xs font-medium text-muted-foreground">
+          Price source
+        </span>
+        <div className="mt-1.5 flex gap-2">
+          {(Object.keys(PRICE_PROVIDERS) as PriceProvider[]).map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setPriceProvider(id)}
+              className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                priceProvider === id
+                  ? "border-primary/50 bg-primary/15 text-foreground"
+                  : "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {PRICE_PROVIDERS[id].label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground/80 mt-1.5">{pp.note}</p>
+      </div>
 
       {/* API key */}
       {!hasKey || editingKey ? (
@@ -80,7 +137,7 @@ export function LivePanel() {
             htmlFor="av-key"
             className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-1.5"
           >
-            <KeyRound className="w-3.5 h-3.5" /> Alpha Vantage API key
+            <KeyRound className="w-3.5 h-3.5" /> {pp.keyLabel}
           </label>
           <div className="flex gap-2">
             <Input
@@ -96,7 +153,7 @@ export function LivePanel() {
             </Button>
           </div>
           <a
-            href="https://www.alphavantage.co/support/#api-key"
+            href={pp.signupUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-primary hover:underline mt-1.5 inline-block"
@@ -190,16 +247,48 @@ export function LivePanel() {
             type="button"
             variant="outline"
             onClick={() => void refreshAll()}
+            disabled={scanning}
             title="Refresh all"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw
+              className={`w-4 h-4 ${scanning ? "animate-spin" : ""}`}
+            />
           </Button>
         )}
       </form>
 
+      {/* Discovery: scan a curated set so the engine surfaces candidates */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          disabled={!hasKey || scanning}
+          onClick={() => void loadSymbols(STARTER_UNIVERSE)}
+        >
+          {scanning ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Scanning…
+            </>
+          ) : (
+            <>
+              <Telescope className="w-4 h-4 mr-1.5" /> Load &amp; scan starter
+              set ({STARTER_UNIVERSE.length})
+            </>
+          )}
+        </Button>
+        {priceProvider === "alphaVantage" && (
+          <span className="text-xs text-accent/90">
+            Tip: switch to Twelve Data above for a full scan — Alpha Vantage's
+            free limit is too small.
+          </span>
+        )}
+      </div>
+
       {symbols.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          No live tickers yet. Add one above to see real technical analysis.
+          No live tickers yet. Add one, or load the starter set to let the
+          engine surface candidates.
         </p>
       )}
 
@@ -245,26 +334,53 @@ export function LivePanel() {
         })}
       </div>
 
-      {/* Scored live plays */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-        {symbols.map((sym, i) => {
-          const entry = entries[sym];
-          if (entry?.status !== "ok" || !entry.play) return null;
-          return (
-            <div key={sym} className="relative">
-              <button
-                type="button"
-                aria-label={`Remove ${sym}`}
-                className="absolute -top-2 -right-2 z-10 rounded-full bg-card border border-border p-1 text-muted-foreground hover:text-destructive"
-                onClick={() => removeSymbol(sym)}
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-              <PlayCard play={entry.play} rank={i + 1} />
-            </div>
-          );
-        })}
-      </div>
+      {/* Surfaced live plays — the ones that fit the criteria */}
+      {liveSurfaced.length > 0 && (
+        <div className="mt-4">
+          <h3 className="font-display text-base font-semibold text-primary mb-2">
+            Surfaced ({liveSurfaced.length}) — 4+ dimensions converging
+          </h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {liveSurfaced.map((play, i) => (
+              <div key={play.symbol} className="relative">
+                <button
+                  type="button"
+                  aria-label={`Remove ${play.symbol}`}
+                  className="absolute -top-2 -right-2 z-10 rounded-full bg-card border border-border p-1 text-muted-foreground hover:text-destructive"
+                  onClick={() => removeSymbol(play.symbol)}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+                <PlayCard play={play} rank={i + 1} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Scanned but not surfaced — ranked by convergence */}
+      {liveWatch.length > 0 && (
+        <div className="mt-4">
+          <h3 className="font-display text-base font-semibold text-muted-foreground mb-2">
+            Scanned ({liveWatch.length}) — ranked, not yet a setup
+          </h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {liveWatch.map((play, i) => (
+              <div key={play.symbol} className="relative">
+                <button
+                  type="button"
+                  aria-label={`Remove ${play.symbol}`}
+                  className="absolute -top-2 -right-2 z-10 rounded-full bg-card border border-border p-1 text-muted-foreground hover:text-destructive"
+                  onClick={() => removeSymbol(play.symbol)}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+                <PlayCard play={play} rank={liveSurfaced.length + i + 1} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
