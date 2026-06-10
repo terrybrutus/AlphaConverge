@@ -1,4 +1,4 @@
-import type { FundamentalData } from "@/lib/providers/finnhub";
+import type { FundamentalData, SentimentData } from "@/lib/providers/finnhub";
 import { type Candle, computeTechnicals } from "@/lib/technicals";
 import type { TickerRaw } from "@/types/ticker";
 
@@ -15,10 +15,17 @@ export function buildLiveTicker(
     sector?: string;
     source: string;
     fundamentals?: FundamentalData;
+    sentiment?: SentimentData;
   },
 ): TickerRaw {
   const tech = computeTechnicals(candles);
   const f = opts.fundamentals;
+  const sent = opts.sentiment;
+
+  const signalAvailability =
+    f || sent
+      ? { ...(f?.availability ?? {}), ...(sent?.availability ?? {}) }
+      : undefined;
 
   return {
     symbol: symbol.toUpperCase(),
@@ -49,10 +56,12 @@ export function buildLiveTicker(
     darkPoolAccumulation: false,
     putCallShift: 0,
 
-    redditMentionVelocity: 0,
-    newsSentiment: 0,
-    analystUpgrade: false,
-    googleTrendsSlope: 0,
+    // Sentiment — real where a source filled it; per-signal availability marks
+    // the rest (Reddit, Google Trends) as "no data".
+    redditMentionVelocity: sent?.fields.redditMentionVelocity ?? 0,
+    newsSentiment: sent?.fields.newsSentiment ?? 0,
+    analystUpgrade: sent?.fields.analystUpgrade ?? false,
+    googleTrendsSlope: sent?.fields.googleTrendsSlope ?? 0,
 
     sectorEtfInflow: 0,
     macroRiskOn: false,
@@ -66,9 +75,9 @@ export function buildLiveTicker(
       technical: true,
       fundamental: !!f,
       microstructure: false,
-      sentiment: false,
+      sentiment: !!sent,
       macro: false,
     },
-    signalAvailability: f?.availability,
+    signalAvailability,
   };
 }

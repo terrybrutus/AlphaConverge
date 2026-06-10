@@ -42,6 +42,14 @@ export const FUND_SIGNAL = {
   inst: "Institutional accumulation",
 } as const;
 
+// Stable names for sentiment sub-signals, same purpose as FUND_SIGNAL.
+export const SENT_SIGNAL = {
+  reddit: "Reddit mention spike",
+  news: "News sentiment positive",
+  analyst: "Analyst upgrade / initiation",
+  trends: "Search interest rising",
+} as const;
+
 function isAvailable(t: TickerRaw, key: CategoryKey): boolean {
   return t.availability?.[key] ?? true;
 }
@@ -236,30 +244,34 @@ function microstructure(t: TickerRaw): CategoryResult {
 function sentiment(t: TickerRaw): CategoryResult {
   const signals: SignalLine[] = [
     {
-      name: "Reddit mention spike",
+      name: SENT_SIGNAL.reddit,
       detail:
         "Mention velocity on r/wallstreetbets / r/stocks is well above its trailing baseline.",
       weight: 0.3,
       fired: t.redditMentionVelocity >= 1,
       value: `${t.redditMentionVelocity.toFixed(1)}σ`,
+      available: signalAvailable(t, SENT_SIGNAL.reddit),
     },
     {
-      name: "News sentiment positive",
-      detail: "Headline NLP sentiment has turned net-positive.",
+      name: SENT_SIGNAL.news,
+      detail: "Recent-headline sentiment has turned net-positive.",
       weight: 0.25,
       fired: t.newsSentiment > 0.15,
+      available: signalAvailable(t, SENT_SIGNAL.news),
     },
     {
-      name: "Analyst upgrade / initiation",
-      detail: "A new upgrade or first-time coverage initiation.",
+      name: SENT_SIGNAL.analyst,
+      detail: "Analyst recommendation trend improved versus the prior period.",
       weight: 0.25,
       fired: t.analystUpgrade,
+      available: signalAvailable(t, SENT_SIGNAL.analyst),
     },
     {
-      name: "Search interest rising",
+      name: SENT_SIGNAL.trends,
       detail: "Google Trends for the ticker is sloping up.",
       weight: 0.2,
       fired: t.googleTrendsSlope > 0.15,
+      available: signalAvailable(t, SENT_SIGNAL.trends),
     },
   ];
   return scoreCategory(

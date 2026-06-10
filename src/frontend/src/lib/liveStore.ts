@@ -4,7 +4,9 @@ import { buildLiveTicker } from "@/lib/liveTicker";
 import { alphaVantageProvider } from "@/lib/providers/alphaVantage";
 import {
   type FundamentalData,
+  type SentimentData,
   fetchFundamentals,
+  fetchSentiment,
 } from "@/lib/providers/finnhub";
 import type { Play } from "@/types/ticker";
 import { create } from "zustand";
@@ -129,23 +131,32 @@ export const useLiveStore = create<LiveState>()(
         try {
           const candles = await provider.weeklyCandles(symbol, apiKey);
 
-          // Fundamentals are best-effort: a failure here must not sink the
-          // technical analysis, which is the core of the live ticker.
+          // Fundamentals + sentiment are best-effort: a failure here must not
+          // sink the technical analysis, which is the core of the live ticker.
           let fundamentals: FundamentalData | undefined;
+          let sentiment: SentimentData | undefined;
           let source = provider.name;
           const { finnhubKey } = get();
           if (finnhubKey) {
             try {
               fundamentals = await fetchFundamentals(symbol, finnhubKey);
-              source = `${provider.name} + Finnhub`;
             } catch {
               fundamentals = undefined;
+            }
+            try {
+              sentiment = await fetchSentiment(symbol, finnhubKey);
+            } catch {
+              sentiment = undefined;
+            }
+            if (fundamentals || sentiment) {
+              source = `${provider.name} + Finnhub`;
             }
           }
 
           const ticker = buildLiveTicker(symbol, candles, {
             source,
             fundamentals,
+            sentiment,
           });
           const play = scoreTicker(ticker);
           set((s) => ({
