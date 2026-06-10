@@ -1,4 +1,4 @@
-import { FUND_SIGNAL } from "@/lib/convergence";
+import { FUND_SIGNAL, SENT_SIGNAL } from "@/lib/convergence";
 
 // Finnhub fundamentals (free tier, CORS-enabled). Get a key at
 // https://finnhub.io/register. Best-effort: each datum is fetched independently
@@ -125,3 +125,97 @@ export async function fetchFundamentals(
 }
 
 export const FINNHUB_NAME = "Finnhub";
+
+// ---------------------------------------------------------------------------
+// Sentiment
+// ---------------------------------------------------------------------------
+export interface SentimentData {
+  fields: {
+    redditMentionVelocity?: number;
+    newsSentiment?: number;
+    analystUpgrade?: boolean;
+    googleTrendsSlope?: number;
+  };
+  availability: Record<string, boolean>;
+}
+
+// Finance-flavored headline lexicon for a lightweight, transparent news score.
+// Crude by design — it is computed from real recent headlines and labeled as
+// headline sentiment, not a black-box NLP model.
+const POS_WORDS =
+  /\b(beat|beats|surge|surges|soar|soars|jump|jumps|rally|rallies|record|surpass|surpasses|upgrade|upgraded|raises|raised|tops|wins|win|approval|approved|breakthrough|profit|profits|growth|gain|gains|strong|outperform|bullish|expands|expansion|partnership|launch|launches|guidance raise)\b/gi;
+const NEG_WORDS =
+  /\b(miss|misses|plunge|plunges|plummet|drop|drops|falls|fell|sink|sinks|cut|cuts|downgrade|downgraded|lawsuit|probe|investigation|weak|loss|losses|bearish|slump|warning|warns|recall|halt|halts|bankruptcy|delay|delays|layoff|layoffs|fraud|decline|declines|slashes|slash)\b/gi;
+
+function headlineSentiment(headlines: string[]): number {
+  let pos = 0;
+  let neg = 0;
+  for (const h of headlines) {
+    pos += (h.match(POS_WORDS) || []).length;
+    neg += (h.match(NEG_WORDS) || []).length;
+  }
+  const total = pos + neg;
+  if (total === 0) return 0;
+  return Math.max(-1, Math.min(1, (pos - neg) / total));
+}
+
+function isoDaysAgo(days: number): string {
+  const d = new Date(Date.now() - days * 24 * 3600 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+
+export async function fetchSentiment(
+  symbol: string,
+  apiKey: string,
+): Promise<SentimentData> {
+  const sym = symbol.trim().toUpperCase();
+  const key = encodeURIComponent(apiKey);
+  const fields: SentimentData["fields"] = {};
+  const availability: Record<string, boolean> = {
+    [SENT_SIGNAL.reddit]: false, // Reddit API is CORS-blocked from the browser
+    [SENT_SIGNAL.news]: false,
+    [SENT_SIGNAL.analyst]: false,
+    [SENT_SIGNAL.trends]: false, // Google Trends has no browser-usable API
+  };
+
+  // News sentiment from recent company headlines.
+  try {
+    const news = (await getJson(
+      `${BASE}/company-news?symbol=${sym}&from=${isoDaysAgo(14)}&to=${isoDaysAgo(0)}&token=${key}`,
+    )) as Array<{ headline?: string; summary?: string }>;
+    if (Array.isArray(news) && news.length > 0) {
+      const headlines = news
+        .slice(0, 40)
+        .map((n) => `${n.headline ?? ""} ${n.summary ?? ""}`);
+      fields.newsSentiment = headlineSentiment(headlines);
+      availability[SENT_SIGNAL.news] = true;
+    }
+  } catch {
+    // leave unavailable
+  }
+
+  // Analyst upgrade: recommendation trend improved vs the prior period.
+  try {
+    const recs = (await getJson(
+      `${BASE}/stock/recommendation?symbol=${sym}&token=${key}`,
+    )) as Array<{
+      strongBuy?: number;
+      buy?: number;
+      sell?: number;
+      strongSell?: number;
+    }>;
+    if (Array.isArray(recs) && recs.length >= 2) {
+      const score = (r: (typeof recs)[number]) =>
+        (r.strongBuy ?? 0) * 2 +
+        (r.buy ?? 0) -
+        (r.sell ?? 0) -
+        (r.strongSell ?? 0) * 2;
+      fields.analystUpgrade = score(recs[0]) - score(recs[1]) > 0;
+      availability[SENT_SIGNAL.analyst] = true;
+    }
+  } catch {
+    // leave unavailable
+  }
+
+  return { fields, availability };
+}

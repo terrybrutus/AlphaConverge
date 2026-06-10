@@ -34,6 +34,13 @@ that wiring.
   Files: `lib/providers/` (provider interface + Alpha Vantage), `lib/liveTicker.ts`
   (candles → scorable ticker), `lib/liveStore.ts` (key + symbols + fetch state).
 
+- **Sentiment category is partially real** (same Finnhub key). Via
+  `lib/providers/finnhub.ts` it sources **news-headline sentiment** (a transparent
+  finance lexicon over the last 14 days of company headlines) and **analyst
+  upgrade** (recommendation trend improving vs the prior period). Reddit mention
+  velocity and Google Trends are **CORS-blocked from the browser**, so they are
+  marked "no data" per signal. With Technical + Fundamental + Sentiment a live
+  ticker can reach 4/6 dimensions and **surface as a full Play**.
 - **AI read (optional).** On any ticker's detail page, an on-click **AI read**
   (`lib/ai/analyze.ts`) sends the engine's computed signals to **Claude Haiku
   4.5** and returns a plain-language thesis + bull/bear case + what would

@@ -68,9 +68,9 @@ export function LivePanel() {
       <p className="text-sm text-muted-foreground mb-4">
         Add any US ticker to score it on <strong>real</strong> data. Technical
         is computed live from price; add a Finnhub key to also source
-        Fundamentals (insider buys, analyst trend, revenue accel). Remaining
-        categories show as “no source” until their providers are wired
-        (DATA.md).
+        Fundamentals (insider buys, revenue accel) and Sentiment (news
+        headlines, analyst trend). Remaining categories show as “no source”
+        until their providers are wired (DATA.md).
       </p>
 
       {/* API key */}
