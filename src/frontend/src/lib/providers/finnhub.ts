@@ -126,6 +126,25 @@ export async function fetchFundamentals(
 
 export const FINNHUB_NAME = "Finnhub";
 
+// Company profile — used to fill the ticker's real name and its sector/industry
+// (which drives the macro sector-ETF mapping). Best-effort.
+export interface ProfileData {
+  name?: string;
+  sector?: string;
+}
+
+export async function fetchProfile(
+  symbol: string,
+  apiKey: string,
+): Promise<ProfileData> {
+  const sym = symbol.trim().toUpperCase();
+  const key = encodeURIComponent(apiKey);
+  const data = (await getJson(
+    `${BASE}/stock/profile2?symbol=${sym}&token=${key}`,
+  )) as { name?: string; finnhubIndustry?: string };
+  return { name: data.name, sector: data.finnhubIndustry };
+}
+
 // ---------------------------------------------------------------------------
 // Sentiment
 // ---------------------------------------------------------------------------

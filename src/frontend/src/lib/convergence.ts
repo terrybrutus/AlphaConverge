@@ -50,6 +50,13 @@ export const SENT_SIGNAL = {
   trends: "Search interest rising",
 } as const;
 
+// Stable names for macro/sector sub-signals.
+export const MACRO_SIGNAL = {
+  sectorEtf: "Sector ETF inflows",
+  riskOn: "Risk-on backdrop",
+  narrative: "Sector narrative tailwind",
+} as const;
+
 function isAvailable(t: TickerRaw, key: CategoryKey): boolean {
   return t.availability?.[key] ?? true;
 }
@@ -285,25 +292,28 @@ function sentiment(t: TickerRaw): CategoryResult {
 function macro(t: TickerRaw): CategoryResult {
   const signals: SignalLine[] = [
     {
-      name: "Sector ETF inflows",
+      name: MACRO_SIGNAL.sectorEtf,
       detail:
-        "The stock's sector is receiving net ETF inflows — institutional money is rotating in.",
+        "The stock's sector ETF is outperforming the broad market — money is rotating into the group.",
       weight: 0.4,
       fired: t.sectorEtfInflow > 0.2,
+      available: signalAvailable(t, MACRO_SIGNAL.sectorEtf),
     },
     {
-      name: "Risk-on backdrop",
+      name: MACRO_SIGNAL.riskOn,
       detail:
-        "The broad macro environment is risk-on (rate direction / liquidity favorable).",
+        "The broad market (S&P 500) is in an uptrend — a risk-on backdrop that lifts setups.",
       weight: 0.3,
       fired: t.macroRiskOn,
+      available: signalAvailable(t, MACRO_SIGNAL.riskOn),
     },
     {
-      name: "Sector narrative tailwind",
+      name: MACRO_SIGNAL.narrative,
       detail:
         "An active narrative is pulling attention and capital toward the sector.",
       weight: 0.3,
       fired: t.sectorNarrative,
+      available: signalAvailable(t, MACRO_SIGNAL.narrative),
     },
   ];
   return scoreCategory(

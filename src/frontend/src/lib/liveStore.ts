@@ -1,11 +1,13 @@
 import { analyzePlay } from "@/lib/ai/analyze";
 import { scoreTicker } from "@/lib/convergence";
 import { buildLiveTicker } from "@/lib/liveTicker";
+import { type MacroFacts, fetchMacro } from "@/lib/macro";
 import { alphaVantageProvider } from "@/lib/providers/alphaVantage";
 import {
   type FundamentalData,
   type SentimentData,
   fetchFundamentals,
+  fetchProfile,
   fetchSentiment,
 } from "@/lib/providers/finnhub";
 import { twelveDataProvider } from "@/lib/providers/twelveData";
@@ -163,13 +165,22 @@ export const useLiveStore = create<LiveState>()(
         try {
           const candles = await provider.weeklyCandles(symbol, apiKey);
 
-          // Fundamentals + sentiment are best-effort: a failure here must not
-          // sink the technical analysis, which is the core of the live ticker.
+          // Everything beyond price is best-effort: a failure here must not sink
+          // the technical analysis, which is the core of the live ticker.
+          let name: string | undefined;
+          let sector: string | undefined;
           let fundamentals: FundamentalData | undefined;
           let sentiment: SentimentData | undefined;
           let source = provider.name;
           const { finnhubKey } = get();
           if (finnhubKey) {
+            try {
+              const profile = await fetchProfile(symbol, finnhubKey);
+              name = profile.name;
+              sector = profile.sector;
+            } catch {
+              // leave undefined
+            }
             try {
               fundamentals = await fetchFundamentals(symbol, finnhubKey);
             } catch {
@@ -185,10 +196,22 @@ export const useLiveStore = create<LiveState>()(
             }
           }
 
+          // Macro/sector uses the price provider (SPY + sector ETF trends,
+          // cached across the scan); sector comes from the profile above.
+          let macro: MacroFacts | undefined;
+          try {
+            macro = await fetchMacro(provider, apiKey, sector);
+          } catch {
+            macro = undefined;
+          }
+
           const ticker = buildLiveTicker(symbol, candles, {
+            name,
+            sector,
             source,
             fundamentals,
             sentiment,
+            macro,
           });
           const play = scoreTicker(ticker);
           set((s) => ({

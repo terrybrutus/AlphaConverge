@@ -101,9 +101,10 @@ export function LivePanel() {
       </div>
       <p className="text-sm text-muted-foreground mb-4">
         Score any US ticker on <strong>real</strong> data, or load the starter
-        set and let the engine surface what converges. Technical is computed
-        live from price; add a Finnhub key to also source Fundamentals (insider
-        buys, revenue accel) and Sentiment (news, analyst trend).
+        set and let the engine surface what converges. Technical and Macro
+        (market regime + sector rotation) are computed live from price; add a
+        Finnhub key to also source Fundamentals (insider buys, revenue accel)
+        and Sentiment (news, analyst trend).
       </p>
 
       {/* Price source */}

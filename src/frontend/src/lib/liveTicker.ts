@@ -1,11 +1,12 @@
+import type { MacroFacts } from "@/lib/macro";
 import type { FundamentalData, SentimentData } from "@/lib/providers/finnhub";
 import { type Candle, computeTechnicals } from "@/lib/technicals";
 import type { TickerRaw } from "@/types/ticker";
 
 // Build a scorable TickerRaw from real price candles (and optionally real
-// fundamentals). Categories without a connected source are marked unavailable so
-// the engine scores them as "no source" rather than fabricating signals. As more
-// live providers are wired (sentiment, options, macro), flip their availability
+// fundamentals / sentiment / macro). Categories without a connected source are
+// marked unavailable so the engine scores them as "no source" rather than
+// fabricating signals. As more live providers are wired, flip their availability
 // flags and fill the corresponding fields.
 export function buildLiveTicker(
   symbol: string,
@@ -16,15 +17,23 @@ export function buildLiveTicker(
     source: string;
     fundamentals?: FundamentalData;
     sentiment?: SentimentData;
+    macro?: MacroFacts;
   },
 ): TickerRaw {
   const tech = computeTechnicals(candles);
   const f = opts.fundamentals;
   const sent = opts.sentiment;
+  const macro = opts.macro;
+  const macroHasData =
+    !!macro && Object.values(macro.availability).some(Boolean);
 
   const signalAvailability =
-    f || sent
-      ? { ...(f?.availability ?? {}), ...(sent?.availability ?? {}) }
+    f || sent || macro
+      ? {
+          ...(f?.availability ?? {}),
+          ...(sent?.availability ?? {}),
+          ...(macro?.availability ?? {}),
+        }
       : undefined;
 
   return {
@@ -63,8 +72,9 @@ export function buildLiveTicker(
     analystUpgrade: sent?.fields.analystUpgrade ?? false,
     googleTrendsSlope: sent?.fields.googleTrendsSlope ?? 0,
 
-    sectorEtfInflow: 0,
-    macroRiskOn: false,
+    // Macro — real where a source filled it; sector narrative stays "no data".
+    sectorEtfInflow: macro?.fields.sectorEtfInflow ?? 0,
+    macroRiskOn: macro?.fields.macroRiskOn ?? false,
     sectorNarrative: false,
 
     impliedVolatilityPctile: 0,
@@ -76,7 +86,7 @@ export function buildLiveTicker(
       fundamental: !!f,
       microstructure: false,
       sentiment: !!sent,
-      macro: false,
+      macro: macroHasData,
     },
     signalAvailability,
   };
