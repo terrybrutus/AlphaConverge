@@ -1,3 +1,4 @@
+import { AiRead } from "@/components/AiRead";
 import { CategoryBreakdown } from "@/components/CategoryBreakdown";
 import { ConvergenceMeter } from "@/components/ConvergenceMeter";
 import { StageBadge } from "@/components/StageBadge";
@@ -171,6 +172,9 @@ export function TickerDetailPage() {
             </div>
           )}
         </motion.div>
+
+        {/* AI read */}
+        <AiRead play={play} />
 
         {/* Price history */}
         <motion.div
