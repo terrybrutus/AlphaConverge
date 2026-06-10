@@ -1,12 +1,13 @@
-import { CredentialVault } from "@/components/CredentialVault";
 import { PlayCard } from "@/components/PlayCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { STARTER_UNIVERSE } from "@/data/starterUniverse";
-import { type PriceProvider, useLiveStore } from "@/lib/liveStore";
+import { useLiveStore } from "@/lib/liveStore";
 import type { Play } from "@/types/ticker";
+import { Link } from "@tanstack/react-router";
 import {
-  KeyRound,
+  CircleHelp,
+  Filter,
   Loader2,
   Plus,
   Radio,
@@ -18,33 +19,14 @@ import {
 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 
-const PRICE_PROVIDERS: Record<
-  PriceProvider,
-  { label: string; keyLabel: string; signupUrl: string; note: string }
-> = {
-  alphaVantage: {
-    label: "Alpha Vantage",
-    keyLabel: "Alpha Vantage API key",
-    signupUrl: "https://www.alphavantage.co/support/#api-key",
-    note: "Free tier ~25 requests/day — fine for a few names, too small to scan a set.",
-  },
-  twelveData: {
-    label: "Twelve Data",
-    keyLabel: "Twelve Data API key",
-    signupUrl: "https://twelvedata.com/pricing",
-    note: "Free tier ~800/day, 8/min — high enough to scan the starter set.",
-  },
-};
+type ResultView = "all" | "surfaced" | "candidates" | "watch";
+type ResultSort = "score" | "coverage" | "symbol";
 
 export function LivePanel() {
   const apiKey = useLiveStore((s) => s.priceKeys[s.priceProvider]);
-  const finnhubKey = useLiveStore((s) => s.finnhubKey);
   const priceProvider = useLiveStore((s) => s.priceProvider);
   const symbols = useLiveStore((s) => s.symbols);
   const entries = useLiveStore((s) => s.entries);
-  const setApiKey = useLiveStore((s) => s.setApiKey);
-  const setFinnhubKey = useLiveStore((s) => s.setFinnhubKey);
-  const setPriceProvider = useLiveStore((s) => s.setPriceProvider);
   const addSymbol = useLiveStore((s) => s.addSymbol);
   const loadSymbols = useLiveStore((s) => s.loadSymbols);
   const removeSymbol = useLiveStore((s) => s.removeSymbol);
@@ -52,14 +34,11 @@ export function LivePanel() {
   const retryErrored = useLiveStore((s) => s.retryErrored);
   const refreshOne = useLiveStore((s) => s.refreshOne);
 
-  const [keyDraft, setKeyDraft] = useState("");
-  const [editingKey, setEditingKey] = useState(false);
-  const [finnhubDraft, setFinnhubDraft] = useState("");
-  const [editingFinnhub, setEditingFinnhub] = useState(false);
   const [symbolDraft, setSymbolDraft] = useState("");
+  const [view, setView] = useState<ResultView>("all");
+  const [sort, setSort] = useState<ResultSort>("score");
 
   const hasKey = apiKey.length > 0;
-  const pp = PRICE_PROVIDERS[priceProvider];
   const scanning = symbols.some((s) => entries[s]?.status === "loading");
   const erroredSymbols = symbols.filter((s) => entries[s]?.status === "error");
 
@@ -67,29 +46,35 @@ export function LivePanel() {
   const livePlays = symbols
     .map((sym) => entries[sym]?.play)
     .filter((p): p is Play => !!p)
-    .sort((a, b) => b.convergenceScore - a.convergenceScore);
+    .sort((a, b) => {
+      if (sort === "coverage") return b.dataCoverage - a.dataCoverage;
+      if (sort === "symbol") return a.symbol.localeCompare(b.symbol);
+      return b.convergenceScore - a.convergenceScore;
+    });
   const liveSurfaced = livePlays.filter((p) => p.surfaced);
-  const liveWatch = livePlays.filter((p) => !p.surfaced);
-
-  const submitKey = (e: FormEvent) => {
-    e.preventDefault();
-    setApiKey(keyDraft);
-    setKeyDraft("");
-    setEditingKey(false);
-  };
-
-  const submitFinnhub = (e: FormEvent) => {
-    e.preventDefault();
-    setFinnhubKey(finnhubDraft);
-    setFinnhubDraft("");
-    setEditingFinnhub(false);
-  };
+  const liveCandidates = livePlays.filter(
+    (p) =>
+      !p.surfaced &&
+      (p.categories.find((category) => category.key === "technical")?.aligned ??
+        false),
+  );
+  const liveWatch = livePlays.filter(
+    (p) => !p.surfaced && !liveCandidates.includes(p),
+  );
+  const showSurfaced = view === "all" || view === "surfaced";
+  const showCandidates = view === "all" || view === "candidates";
+  const showWatch = view === "all" || view === "watch";
 
   const submitSymbol = (e: FormEvent) => {
     e.preventDefault();
-    const s = symbolDraft.trim();
-    if (!s) return;
-    addSymbol(s);
+    const incoming = symbolDraft
+      .toUpperCase()
+      .split(/[\s,;]+/)
+      .map((symbol) => symbol.trim())
+      .filter(Boolean);
+    if (incoming.length === 0) return;
+    if (incoming.length === 1) addSymbol(incoming[0]);
+    else void loadSymbols(incoming);
     setSymbolDraft("");
   };
 
@@ -106,151 +91,34 @@ export function LivePanel() {
       </div>
       <p className="text-sm text-muted-foreground mb-4">
         Score any US ticker on <strong>real</strong> data, or load the starter
-        set and let the engine surface what converges. Technical and Macro
-        (market regime + sector rotation) are computed live from price; add a
-        Finnhub key to also source Fundamentals (insider buys, revenue accel)
-        and Sentiment (news, analyst trend).
+        set and let the engine rank what it can support. A Candidate has aligned
+        technical structure but is not a confirmed Surfaced play.
       </p>
-      <p className="text-xs text-muted-foreground mb-4">
-        API keys stay in memory for this browser session only. They are not sent
-        to or stored by the ICP canister.
-      </p>
-
-      {/* Price source */}
-      <div className="mb-4">
-        <span className="text-xs font-medium text-muted-foreground">
-          Price source
-        </span>
-        <div className="mt-1.5 flex gap-2">
-          {(Object.keys(PRICE_PROVIDERS) as PriceProvider[]).map((id) => (
-            <button
-              key={id}
-              type="button"
-              disabled={scanning}
-              onClick={() => setPriceProvider(id)}
-              className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-40 ${
-                priceProvider === id
-                  ? "border-primary/50 bg-primary/15 text-foreground"
-                  : "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {PRICE_PROVIDERS[id].label}
-            </button>
-          ))}
-        </div>
-        <p className="text-xs text-muted-foreground/80 mt-1.5">{pp.note}</p>
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card/60 px-3 py-2 text-xs text-muted-foreground">
+        <CircleHelp className="h-4 w-4 text-primary" />
+        Using {priceProvider === "twelveData" ? "Twelve Data" : "Alpha Vantage"}
+        . Results are cached snapshots after a successful scan; refresh them
+        before acting.
+        <Link
+          to="/settings"
+          className="font-semibold text-primary hover:underline"
+        >
+          Configure data sources
+        </Link>
+        <Link
+          to="/examples"
+          className="font-semibold text-primary hover:underline"
+        >
+          See illustrated examples
+        </Link>
       </div>
-
-      {/* API key */}
-      {!hasKey || editingKey ? (
-        <form onSubmit={submitKey} className="mb-4">
-          <label
-            htmlFor="av-key"
-            className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-1.5"
-          >
-            <KeyRound className="w-3.5 h-3.5" /> {pp.keyLabel}
-          </label>
-          <div className="flex gap-2">
-            <Input
-              id="av-key"
-              type="password"
-              value={keyDraft}
-              onChange={(e) => setKeyDraft(e.target.value)}
-              placeholder="Paste your free key"
-              className="bg-muted/50"
-            />
-            <Button type="submit" disabled={!keyDraft.trim()}>
-              Save
-            </Button>
-          </div>
-          <a
-            href={pp.signupUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-primary hover:underline mt-1.5 inline-block"
-          >
-            Get a free key (~30 seconds) →
-          </a>
-        </form>
-      ) : (
-        <div className="flex items-center justify-between mb-4 text-sm">
-          <span className="text-muted-foreground">
-            <KeyRound className="w-3.5 h-3.5 inline mr-1" /> Price key active
-            this session
-          </span>
-          <button
-            type="button"
-            className="text-xs text-primary hover:underline"
-            onClick={() => setEditingKey(true)}
-          >
-            Change
-          </button>
-        </div>
-      )}
-
-      {/* Optional Finnhub key — unlocks the Fundamental category */}
-      {finnhubKey.length === 0 || editingFinnhub ? (
-        <form onSubmit={submitFinnhub} className="mb-4">
-          <label
-            htmlFor="fh-key"
-            className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-1.5"
-          >
-            <KeyRound className="w-3.5 h-3.5" /> Finnhub API key{" "}
-            <span className="text-muted-foreground/70">
-              (optional — adds Fundamentals)
-            </span>
-          </label>
-          <div className="flex gap-2">
-            <Input
-              id="fh-key"
-              type="password"
-              value={finnhubDraft}
-              onChange={(e) => setFinnhubDraft(e.target.value)}
-              placeholder="Paste your free Finnhub key"
-              className="bg-muted/50"
-            />
-            <Button
-              type="submit"
-              variant="outline"
-              disabled={!finnhubDraft.trim()}
-            >
-              Save
-            </Button>
-          </div>
-          <a
-            href="https://finnhub.io/register"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-primary hover:underline mt-1.5 inline-block"
-          >
-            Get a free Finnhub key →
-          </a>
-        </form>
-      ) : (
-        <div className="flex items-center justify-between mb-4 text-sm">
-          <span className="text-muted-foreground">
-            <KeyRound className="w-3.5 h-3.5 inline mr-1" /> Fundamentals key
-            active this session
-          </span>
-          <button
-            type="button"
-            className="text-xs text-primary hover:underline"
-            onClick={() => setEditingFinnhub(true)}
-          >
-            Change
-          </button>
-        </div>
-      )}
-
-      {/* Add symbol */}
-      <CredentialVault />
 
       {/* Add symbol */}
       <form onSubmit={submitSymbol} className="flex gap-2 mb-4">
         <Input
           value={symbolDraft}
           onChange={(e) => setSymbolDraft(e.target.value.toUpperCase())}
-          placeholder="Add ticker (e.g. PLTR)"
+          placeholder="Add or paste tickers (PLTR, SOFI, HOOD)"
           className="bg-muted/50"
           disabled={!hasKey}
         />
@@ -306,15 +174,51 @@ export function LivePanel() {
             disabled={scanning}
             onClick={() => void retryErrored()}
           >
-            <RotateCcw className="w-4 h-4 mr-1.5" /> Retry {erroredSymbols.length} failed
+            <RotateCcw className="w-4 h-4 mr-1.5" /> Retry{" "}
+            {erroredSymbols.length} failed
           </Button>
         )}
       </div>
 
+      {livePlays.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card/50 p-2">
+          <Filter className="ml-1 h-4 w-4 text-muted-foreground" />
+          {(["all", "surfaced", "candidates", "watch"] as ResultView[]).map(
+            (option) => (
+              <Button
+                key={option}
+                type="button"
+                size="sm"
+                variant={view === option ? "secondary" : "ghost"}
+                onClick={() => setView(option)}
+              >
+                {option === "all"
+                  ? `All ${livePlays.length}`
+                  : option === "surfaced"
+                    ? `Surfaced ${liveSurfaced.length}`
+                    : option === "candidates"
+                      ? `Candidates ${liveCandidates.length}`
+                      : `On watch ${liveWatch.length}`}
+              </Button>
+            ),
+          )}
+          <select
+            value={sort}
+            onChange={(event) => setSort(event.target.value as ResultSort)}
+            className="ml-auto rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground"
+            aria-label="Sort live results"
+          >
+            <option value="score">Highest evidence score</option>
+            <option value="coverage">Highest data coverage</option>
+            <option value="symbol">Ticker symbol</option>
+          </select>
+        </div>
+      )}
+
       {symbols.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          No live tickers yet. Add one, or load the starter set to let the
-          engine surface candidates.
+          No live tickers yet. Add one, paste a comma-separated list from a
+          screener such as Finviz, or load the starter set.
         </p>
       )}
 
@@ -359,14 +263,14 @@ export function LivePanel() {
                     <RotateCcw className="w-4 h-4" />
                   </button>
                 )}
-              <button
-                type="button"
-                aria-label={`Remove ${sym}`}
-                className="text-muted-foreground hover:text-destructive"
-                onClick={() => removeSymbol(sym)}
-              >
-                <X className="w-4 h-4" />
-              </button>
+                <button
+                  type="button"
+                  aria-label={`Remove ${sym}`}
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => removeSymbol(sym)}
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             </div>
           );
@@ -374,7 +278,7 @@ export function LivePanel() {
       </div>
 
       {/* Surfaced live plays — the ones that fit the criteria */}
-      {liveSurfaced.length > 0 && (
+      {showSurfaced && liveSurfaced.length > 0 && (
         <div className="mt-4">
           <h3 className="font-display text-base font-semibold text-primary mb-2">
             Surfaced ({liveSurfaced.length}) — independent evidence confirmed
@@ -397,8 +301,35 @@ export function LivePanel() {
         </div>
       )}
 
+      {showCandidates && liveCandidates.length > 0 && (
+        <div className="mt-4">
+          <h3 className="font-display text-base font-semibold text-chart-4 mb-1">
+            Candidates ({liveCandidates.length}) — technical structure aligned
+          </h3>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Worth researching, but not confirmed: the app still lacks two
+            sufficiently covered independent company evidence families.
+          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {liveCandidates.map((play, i) => (
+              <div key={play.symbol} className="relative">
+                <button
+                  type="button"
+                  aria-label={`Remove ${play.symbol}`}
+                  className="absolute -top-2 -right-2 z-10 rounded-full bg-card border border-border p-1 text-muted-foreground hover:text-destructive"
+                  onClick={() => removeSymbol(play.symbol)}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+                <PlayCard play={play} rank={liveSurfaced.length + i + 1} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Scanned but not surfaced — ranked by convergence */}
-      {liveWatch.length > 0 && (
+      {showWatch && liveWatch.length > 0 && (
         <div className="mt-4">
           <h3 className="font-display text-base font-semibold text-muted-foreground mb-2">
             Scanned ({liveWatch.length}) — ranked, not yet a setup

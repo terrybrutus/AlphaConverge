@@ -129,7 +129,10 @@ function technical(t: TickerRaw): CategoryResult {
         "Price compressed into a tight range on contracting volume after a decline — the market has stopped caring, which is where quiet accumulation happens.",
       weight: 0.2,
       fired: baseFormation,
-      value: `${Math.round(t.volumeContraction * 100)}% volume dry-up`,
+      value:
+        t.volumeContraction <= 0
+          ? "No recent volume dry-up"
+          : `${Math.round(t.volumeContraction * 100)}% volume dry-up`,
     },
     {
       name: "Weekly bullish divergence",

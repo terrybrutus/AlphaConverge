@@ -71,7 +71,7 @@ function Verdict({ result }: { result: BtResult }) {
   let text: string;
   if (!enough) {
     text =
-      "Not enough high-convergence samples to draw a conclusion — widen the universe or horizon.";
+      "Not enough high-convergence samples to draw a conclusion — use deeper history or a shorter forward horizon.";
   } else if (beatsBaseline && alignedBeats) {
     text =
       "In this sample, weeks with higher technical convergence preceded higher forward returns than average — the chart-structure signal showed a real edge. (Validate on more names and horizons before trusting it.)";
@@ -219,12 +219,15 @@ export function BacktestPage() {
           </Button>
           {!apiKey && (
             <p className="text-xs text-accent/90">
-              Add a price-source API key in the Screener's Live panel first
-              (Twelve Data recommended for the larger fetch).
+              Add a price-source API key on Settings first (Twelve Data
+              recommended for the larger fetch).
             </p>
           )}
           {backtest.status === "error" && (
-            <p className="text-sm text-destructive">{backtest.error}</p>
+            <div className="rounded-lg border border-accent/30 bg-accent/10 p-3 text-sm text-accent">
+              {backtest.error} Results below are provisional and shown for
+              transparency.
+            </div>
           )}
           {backtest.progress.total > 0 && (
             <p className="text-xs text-muted-foreground">
@@ -251,7 +254,7 @@ export function BacktestPage() {
         </div>
 
         {/* Results */}
-        {result && backtest.status === "done" && (
+        {result && backtest.status !== "running" && (
           <motion.div
             className="mt-8 space-y-6"
             initial={{ opacity: 0, y: 16 }}
@@ -272,10 +275,9 @@ export function BacktestPage() {
                   </h2>
                   <p className="text-xs text-muted-foreground mb-3">
                     {result.total.toLocaleString()} observations across{" "}
-                    {result.baseline.effectiveCount.toLocaleString()} independent
-                    time periods ·{" "}
-                    {result.horizon}-week forward return · baseline (avg of all
-                    weeks){" "}
+                    {result.baseline.effectiveCount.toLocaleString()}{" "}
+                    independent time periods · {result.horizon}-week forward
+                    return · baseline (avg of all weeks){" "}
                     <span className="font-mono">
                       {pct(result.baseline.avgReturn)}
                     </span>
@@ -285,6 +287,13 @@ export function BacktestPage() {
                     </span>
                     . Hover a return or win rate for its approximate 95%
                     confidence interval.
+                  </p>
+                  <p className="mb-3 rounded-lg border border-border bg-muted/40 p-2 text-xs text-muted-foreground">
+                    “Independent time periods” means distinct calendar windows,
+                    not ticker count. Many tickers measured over the same dates
+                    add observations but still share one market period. A
+                    shorter horizon or deeper history creates more independent
+                    periods.
                   </p>
                   <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-3 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
                     <span>Score bucket</span>

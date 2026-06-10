@@ -13,11 +13,11 @@ import { useState } from "react";
 export function CredentialVault() {
   const { isAuthenticated } = useInternetIdentity();
   const { actor } = useActor(createWatchlistActor);
-  const apiKey = useLiveStore((s) => s.apiKey);
+  const priceKeys = useLiveStore((s) => s.priceKeys);
   const finnhubKey = useLiveStore((s) => s.finnhubKey);
   const aiKey = useLiveStore((s) => s.aiKey);
   const priceProvider = useLiveStore((s) => s.priceProvider);
-  const setApiKey = useLiveStore((s) => s.setApiKey);
+  const setPriceKey = useLiveStore((s) => s.setPriceKey);
   const setFinnhubKey = useLiveStore((s) => s.setFinnhubKey);
   const setAiKey = useLiveStore((s) => s.setAiKey);
   const setPriceProvider = useLiveStore((s) => s.setPriceProvider);
@@ -38,7 +38,7 @@ export function CredentialVault() {
     setStatus("Encrypting...");
     try {
       const vault = await encryptCredentialVault(
-        { apiKey, finnhubKey, aiKey, priceProvider },
+        { priceKeys, finnhubKey, aiKey, priceProvider },
         passphrase,
       );
       await actor.setCredentialVault(vault);
@@ -56,7 +56,8 @@ export function CredentialVault() {
       const remote = await actor.getCredentialVault();
       if (remote.length === 0) throw new Error("No encrypted vault saved yet.");
       const payload = await decryptCredentialVault(remote[0], passphrase);
-      setApiKey(payload.apiKey);
+      setPriceKey("alphaVantage", payload.priceKeys.alphaVantage);
+      setPriceKey("twelveData", payload.priceKeys.twelveData);
       setFinnhubKey(payload.finnhubKey);
       setAiKey(payload.aiKey);
       setPriceProvider(payload.priceProvider);
@@ -95,7 +96,13 @@ export function CredentialVault() {
         <Button
           type="button"
           variant="outline"
-          disabled={!passphrase || (!apiKey && !finnhubKey && !aiKey)}
+          disabled={
+            !passphrase ||
+            (!priceKeys.alphaVantage &&
+              !priceKeys.twelveData &&
+              !finnhubKey &&
+              !aiKey)
+          }
           onClick={() => void save()}
         >
           Save encrypted

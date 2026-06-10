@@ -2,7 +2,7 @@ import { AccountControl } from "@/components/AccountControl";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Layers, Moon, Sun } from "lucide-react";
+import { Layers, Moon, Settings, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { ReactNode } from "react";
 
@@ -72,6 +72,16 @@ export function Layout({ children }: LayoutProps) {
               </nav>
             )}
 
+            <Link to="/settings" title="Settings">
+              <Button
+                variant={isActive("/settings") ? "secondary" : "ghost"}
+                size={isMobile ? "icon" : "sm"}
+                className="text-sm font-medium"
+              >
+                <Settings className="w-4 h-4 md:mr-1.5" />
+                <span className="hidden md:inline">Settings</span>
+              </Button>
+            </Link>
             <AccountControl />
             <Button
               type="button"

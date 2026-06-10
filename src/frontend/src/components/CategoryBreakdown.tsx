@@ -54,7 +54,7 @@ export function CategoryBreakdown({ category }: { category: CategoryResult }) {
         >
           {category.score}
           <span className="ml-2 text-[10px] font-normal text-muted-foreground">
-            {category.coverage}% covered
+            {category.coverage}% weighted data coverage
           </span>
         </span>
       </div>
@@ -115,6 +115,11 @@ export function CategoryBreakdown({ category }: { category: CategoryResult }) {
           );
         })}
       </ul>
+      <p className="mt-3 border-t border-border pt-2 text-[10px] leading-relaxed text-muted-foreground">
+        Check = sourced and passed. Minus = sourced but did not pass. Plug = no
+        connected source. Coverage follows each signal's intended weight, so it
+        is not simply the number of rows with data.
+      </p>
     </div>
   );
 }

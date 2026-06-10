@@ -1,7 +1,9 @@
 import { Layout } from "@/components/Layout";
 import { BacktestPage } from "@/pages/BacktestPage";
+import { ExamplesPage } from "@/pages/ExamplesPage";
 import { MethodologyPage } from "@/pages/MethodologyPage";
 import { ScreenerPage } from "@/pages/ScreenerPage";
+import { SettingsPage } from "@/pages/SettingsPage";
 import { TickerDetailPage } from "@/pages/TickerDetailPage";
 import {
   Outlet,
@@ -44,11 +46,25 @@ const backtestRoute = createRoute({
   component: BacktestPage,
 });
 
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings",
+  component: SettingsPage,
+});
+
+const examplesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/examples",
+  component: ExamplesPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   tickerRoute,
   methodologyRoute,
   backtestRoute,
+  settingsRoute,
+  examplesRoute,
 ]);
 
 const router = createRouter({ routeTree });

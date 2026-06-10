@@ -21,7 +21,11 @@ export function ConvergenceMeter({
   const color = scoreColor(score);
   const numberClass = size === "lg" ? "text-4xl" : "text-2xl";
   return (
-    <div className="flex flex-col items-center" data-ocid="convergence.meter">
+    <div
+      className="flex flex-col items-center"
+      data-ocid="convergence.meter"
+      title="Overall evidence score. Missing evidence earns no points; the separate coverage figure shows how much of the intended model had a source."
+    >
       <span
         className={`font-display font-bold tabular-nums ${numberClass} ${color}`}
       >

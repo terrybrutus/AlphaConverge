@@ -20,17 +20,41 @@ interface TdResponse {
   message?: string;
 }
 
+const REQUEST_INTERVAL_MS = 8_000;
+let nextRequestAt = 0;
+let requestGate = Promise.resolve();
+
+// Every Twelve Data request, including SPY and sector-ETF benchmark calls,
+// passes through one browser-side queue. This is safer than pacing only between
+// tickers because a single ticker analysis can require multiple price requests.
+async function rateLimitedFetch(url: string): Promise<Response> {
+  let release = () => {};
+  const previous = requestGate;
+  requestGate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  try {
+    const wait = Math.max(0, nextRequestAt - Date.now());
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    nextRequestAt = Date.now() + REQUEST_INTERVAL_MS;
+    return await fetch(url);
+  } finally {
+    release();
+  }
+}
+
 export const twelveDataProvider: MarketDataProvider = {
   name: "Twelve Data",
   requiresKey: true,
 
   async weeklyCandles(symbol: string, apiKey: string): Promise<Candle[]> {
     const sym = symbol.trim().toUpperCase();
-    const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym)}&interval=1week&outputsize=160&apikey=${encodeURIComponent(apiKey)}`;
+    const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym)}&interval=1week&outputsize=5000&apikey=${encodeURIComponent(apiKey)}`;
 
     let res: Response;
     try {
-      res = await fetch(url);
+      res = await rateLimitedFetch(url);
     } catch (e) {
       throw new Error(
         `Network error reaching Twelve Data: ${(e as Error).message}`,

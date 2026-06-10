@@ -16,9 +16,10 @@ export function SampleDataBanner() {
         </p>
         <p className="text-accent/80 leading-snug mt-0.5">
           The plays in this section are fabricated inputs that demonstrate the
-          convergence engine across every stage. For real analysis, add tickers
-          to <strong>Live tickers</strong> above. Full multi-category live data
-          is wired per <span className="font-mono">DATA.md</span>.
+          convergence engine across every stage. For real analysis, return to
+          the <strong>Screener</strong>. Current live source coverage and
+          remaining provider work are documented in{" "}
+          <span className="font-mono">DATA.md</span>.
         </p>
       </div>
     </div>
