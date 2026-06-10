@@ -1,3 +1,4 @@
+import { analyzePlay } from "@/lib/ai/analyze";
 import { scoreTicker } from "@/lib/convergence";
 import { buildLiveTicker } from "@/lib/liveTicker";
 import { alphaVantageProvider } from "@/lib/providers/alphaVantage";
@@ -15,17 +16,27 @@ export interface LiveEntry {
   error?: string;
 }
 
+export interface AiNote {
+  status: "loading" | "ok" | "error";
+  text?: string;
+  error?: string;
+}
+
 interface LiveState {
   apiKey: string; // Alpha Vantage (price/technical)
   finnhubKey: string; // Finnhub (fundamentals) — optional
+  aiKey: string; // Anthropic (AI read) — optional
   symbols: string[];
   entries: Record<string, LiveEntry>;
+  aiNotes: Record<string, AiNote>;
   setApiKey: (key: string) => void;
   setFinnhubKey: (key: string) => void;
+  setAiKey: (key: string) => void;
   addSymbol: (symbol: string) => void;
   removeSymbol: (symbol: string) => void;
   refreshOne: (symbol: string) => Promise<void>;
   refreshAll: () => Promise<void>;
+  analyze: (play: Play) => Promise<void>;
 }
 
 const provider = alphaVantageProvider;
@@ -35,11 +46,47 @@ export const useLiveStore = create<LiveState>()(
     (set, get) => ({
       apiKey: "",
       finnhubKey: "",
+      aiKey: "",
       symbols: [],
       entries: {},
+      aiNotes: {},
 
       setApiKey: (key) => set({ apiKey: key.trim() }),
       setFinnhubKey: (key) => set({ finnhubKey: key.trim() }),
+      setAiKey: (key) => set({ aiKey: key.trim() }),
+
+      analyze: async (play) => {
+        const { aiKey } = get();
+        const sym = play.symbol;
+        if (!aiKey) {
+          set((s) => ({
+            aiNotes: {
+              ...s.aiNotes,
+              [sym]: {
+                status: "error",
+                error: "Add your Anthropic API key first.",
+              },
+            },
+          }));
+          return;
+        }
+        set((s) => ({
+          aiNotes: { ...s.aiNotes, [sym]: { status: "loading" } },
+        }));
+        try {
+          const text = await analyzePlay(play, aiKey);
+          set((s) => ({
+            aiNotes: { ...s.aiNotes, [sym]: { status: "ok", text } },
+          }));
+        } catch (e) {
+          set((s) => ({
+            aiNotes: {
+              ...s.aiNotes,
+              [sym]: { status: "error", error: (e as Error).message },
+            },
+          }));
+        }
+      },
 
       addSymbol: (raw) => {
         const symbol = raw.trim().toUpperCase();
@@ -126,6 +173,7 @@ export const useLiveStore = create<LiveState>()(
       partialize: (s) => ({
         apiKey: s.apiKey,
         finnhubKey: s.finnhubKey,
+        aiKey: s.aiKey,
         symbols: s.symbols,
       }),
     },

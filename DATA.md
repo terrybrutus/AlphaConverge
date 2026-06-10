@@ -34,6 +34,14 @@ that wiring.
   Files: `lib/providers/` (provider interface + Alpha Vantage), `lib/liveTicker.ts`
   (candles → scorable ticker), `lib/liveStore.ts` (key + symbols + fetch state).
 
+- **AI read (optional).** On any ticker's detail page, an on-click **AI read**
+  (`lib/ai/analyze.ts`) sends the engine's computed signals to **Claude Haiku
+  4.5** and returns a plain-language thesis + bull/bear case + what would
+  invalidate the setup. Cheapest model, runs only on click, uses the user's own
+  Anthropic key (stored in-browser, sent direct to Anthropic via the documented
+  browser-access header). It reads *only* the engine's signals — it does not
+  invent data, and it names categories that have no source.
+
 Each remaining category below becomes real by adding a provider that fills its
 fields and flipping its `availability` flag in `buildLiveTicker`.
 
