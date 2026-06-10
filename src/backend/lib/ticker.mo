@@ -280,7 +280,9 @@ module {
   };
 
   public func addToWatchlist(watchlist : List.List<Text>, symbol : Text) : () {
-    for (s in watchlist.vals()) {
+    // List has no direct iterator field; convert to an array first (arrays
+    // expose `.vals()`), matching how the rest of the codebase iterates Lists.
+    for (s in watchlist.toArray().vals()) {
       if (s == symbol) { return };
     };
     watchlist.add(symbol);

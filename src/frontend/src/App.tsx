@@ -1,4 +1,5 @@
 import { Layout } from "@/components/Layout";
+import { MethodologyPage } from "@/pages/MethodologyPage";
 import { ScreenerPage } from "@/pages/ScreenerPage";
 import { TickerDetailPage } from "@/pages/TickerDetailPage";
 import {
@@ -30,7 +31,17 @@ const tickerRoute = createRoute({
   component: TickerDetailPage,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, tickerRoute]);
+const methodologyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/how-it-works",
+  component: MethodologyPage,
+});
+
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  tickerRoute,
+  methodologyRoute,
+]);
 
 const router = createRouter({ routeTree });
 

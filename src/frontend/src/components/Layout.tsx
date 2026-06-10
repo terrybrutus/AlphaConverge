@@ -50,6 +50,15 @@ export function Layout({ children }: LayoutProps) {
                     Screener
                   </Button>
                 </Link>
+                <Link to="/how-it-works" data-ocid="layout.nav_methodology">
+                  <Button
+                    variant={isActive("/how-it-works") ? "secondary" : "ghost"}
+                    size="sm"
+                    className="text-sm font-medium"
+                  >
+                    How it works
+                  </Button>
+                </Link>
               </nav>
             )}
 
