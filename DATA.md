@@ -55,6 +55,13 @@ worker), not browser fetches.
   velocity and Google Trends are **CORS-blocked from the browser**, so they are
   marked "no data" per signal. With Technical + Fundamental + Sentiment a live
   ticker can reach 4/6 dimensions and **surface as a full Play**.
+- **Macro & sector category is partially real** (`lib/macro.ts`, computed from
+  the price provider). **Risk-on backdrop** = the S&P 500 (SPY) is in an
+  uptrend; **sector ETF inflows** = the stock's sector ETF outperforming SPY
+  over ~12 weeks (rotation proxy, mapped from the Finnhub profile's industry).
+  Benchmark candles are cached across a scan. Sector narrative has no free
+  deterministic source → "no data". With four wired categories a live ticker
+  can now reach **5/6** dimensions.
 - **AI read (optional).** On any ticker's detail page, an on-click **AI read**
   (`lib/ai/analyze.ts`) sends the engine's computed signals to **Claude Haiku
   4.5** and returns a plain-language thesis + bull/bear case + what would
