@@ -57,6 +57,15 @@ export const MACRO_SIGNAL = {
   narrative: "Sector narrative tailwind",
 } as const;
 
+// Stable names for microstructure sub-signals.
+export const MICRO_SIGNAL = {
+  unusualCall: "Unusual call activity",
+  shortFuel: "Short-squeeze fuel",
+  accumulation: "Volume accumulation",
+  darkPool: "Dark-pool accumulation",
+  putCall: "Put/call shift to calls",
+} as const;
+
 function isAvailable(t: TickerRaw, key: CategoryKey): boolean {
   return t.availability?.[key] ?? true;
 }
@@ -211,33 +220,45 @@ function fundamental(t: TickerRaw): CategoryResult {
 function microstructure(t: TickerRaw): CategoryResult {
   const signals: SignalLine[] = [
     {
-      name: "Unusual call activity",
+      name: MICRO_SIGNAL.unusualCall,
       detail:
         "Out-of-the-money call buying well above normal volume, weeks before expiry — a smart-money tell.",
-      weight: 0.35,
+      weight: 0.3,
       fired: t.unusualCallActivity,
+      available: signalAvailable(t, MICRO_SIGNAL.unusualCall),
     },
     {
-      name: "Short-squeeze fuel",
+      name: MICRO_SIGNAL.shortFuel,
       detail:
         "Elevated short interest. On any positive catalyst, shorts must buy to cover — a force multiplier.",
-      weight: 0.3,
+      weight: 0.25,
       fired: t.shortInterestPct >= 15,
       value: `${t.shortInterestPct.toFixed(0)}% short`,
+      available: signalAvailable(t, MICRO_SIGNAL.shortFuel),
     },
     {
-      name: "Dark-pool accumulation",
+      name: MICRO_SIGNAL.accumulation,
+      detail:
+        "On-Balance-Volume is trending up — volume is flowing into up-weeks, a sign of quiet accumulation.",
+      weight: 0.2,
+      fired: t.obvRising,
+      available: signalAvailable(t, MICRO_SIGNAL.accumulation),
+    },
+    {
+      name: MICRO_SIGNAL.darkPool,
       detail:
         "Large off-exchange prints consistent with quiet institutional buying.",
-      weight: 0.2,
+      weight: 0.15,
       fired: t.darkPoolAccumulation,
+      available: signalAvailable(t, MICRO_SIGNAL.darkPool),
     },
     {
-      name: "Put/call shift to calls",
+      name: MICRO_SIGNAL.putCall,
       detail:
         "Options positioning is rotating toward calls relative to its baseline.",
-      weight: 0.15,
+      weight: 0.1,
       fired: t.putCallShift < -0.2,
+      available: signalAvailable(t, MICRO_SIGNAL.putCall),
     },
   ];
   return scoreCategory(
