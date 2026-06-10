@@ -17,7 +17,7 @@ const DIMENSIONS = [
     icon: CandlestickChart,
     title: "Technical structure",
     plain:
-      "The shape of the chart. Is price building a quiet base after a long fall? Is momentum quietly turning up while price is still flat (bullish divergence)? Has it made its first higher high? These say selling is exhausting and buyers are stepping in.",
+      "The price-structure family. Technical signals, lifecycle stage, and OBV all come from price/volume, so they count together as one confirmation rather than three independent votes.",
   },
   {
     icon: Building2,
@@ -29,25 +29,25 @@ const DIMENSIONS = [
     icon: Waves,
     title: "Market microstructure",
     plain:
-      "What the smart money is doing under the surface. Unusual call buying weeks before expiry, heavy short interest that becomes rocket fuel on any good news, and large off-exchange (dark-pool) prints that look like quiet accumulation.",
+      "Independent positioning data: unusual call buying, heavy short interest, large off-exchange prints, and put/call shifts. Price-derived OBV belongs to technical structure and never contributes to this confirmation.",
   },
   {
     icon: MessageSquare,
     title: "Sentiment",
     plain:
-      "The crowd waking up. A spike in Reddit mentions, news turning positive, a fresh analyst upgrade, rising search interest. On its own this is noise — it only matters stacked with the others.",
+      "The crowd waking up. A spike in Reddit mentions, news turning positive, and rising search interest. Analyst recommendations stay out because they overlap with fundamental analyst evidence.",
   },
   {
     icon: Globe2,
     title: "Macro & sector",
     plain:
-      "The tide. Is money flowing into this stock's sector, is the broad market risk-on, is there a story pulling attention to the group? A perfect setup can still fail if the whole sector is being sold.",
+      "The tide. Sector relative strength and the broad market regime matter, but this is context rather than another company-specific confirmation.",
   },
   {
     icon: Layers,
     title: "Lifecycle stage",
     plain:
-      "Where in the recovery the stock is — because that decides HOW you play it, not just whether to.",
+      "Where in the recovery the stock is. It describes timing and fatigue risk, but does not add another independent convergence vote.",
   },
 ];
 
@@ -93,7 +93,7 @@ const INSTRUMENTS: { instrument: Instrument; when: string }[] = [
   },
   {
     instrument: "pass",
-    when: "Fewer than four dimensions agree — watch it, don't commit capital.",
+    when: "Independent evidence or instrument-specific data is insufficient — watch it, don't commit capital.",
   },
 ];
 
@@ -125,16 +125,18 @@ export function MethodologyPage() {
             things lined up at the same time. One signal is noise. The edge is{" "}
             <span className="text-foreground font-medium">convergence</span> —
             independent categories all pointing the same way at once.
-            AlphaConverge scores six of them and only surfaces a stock when at
+            AlphaConverge only surfaces a stock when price structure and at
             least{" "}
-            <span className="text-foreground font-medium">four of six</span>{" "}
-            agree.
+            <span className="text-foreground font-medium">
+              two independent non-price company evidence families
+            </span>{" "}
+            agree with sufficient data coverage.
           </p>
         </motion.div>
 
         {/* Dimensions */}
         <div className="mt-10">
-          <SectionTitle>The six dimensions</SectionTitle>
+          <SectionTitle>Evidence families and context</SectionTitle>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {DIMENSIONS.map((d) => (
               <div
@@ -184,7 +186,9 @@ export function MethodologyPage() {
           <SectionTitle>Matching the instrument to the setup</SectionTitle>
           <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
             The same convergence can call for a very different trade depending
-            on the stage. AlphaConverge picks one for you and explains why.
+            on the stage. AlphaConverge only suggests an options instrument when
+            live volatility, liquidity, and spread data are explicitly
+            available.
           </p>
           <div className="space-y-3">
             {INSTRUMENTS.map((it) => (

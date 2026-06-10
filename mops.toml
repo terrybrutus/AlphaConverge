@@ -35,4 +35,7 @@ core = "2.5.0"
 
 [canisters.backend.migrations]
 chain = "src/backend/migrations"
-check-limit = 1
+# The deployed snapshot predates the three AlphaConverge state migrations.
+# Keep all three steps in the compatibility check so upgrades cannot skip data
+# shape transitions or silently discard stable variables.
+check-limit = 3

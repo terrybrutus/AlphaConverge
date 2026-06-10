@@ -4,11 +4,10 @@ import type { FundamentalData, SentimentData } from "@/lib/providers/finnhub";
 import { type Candle, computeTechnicals } from "@/lib/technicals";
 import type { TickerRaw } from "@/types/ticker";
 
-// Microstructure availability for a live ticker: only the volume-accumulation
-// (OBV) signal is free; options flow / short interest / dark pool need paid
-// feeds, so they're marked "no data" rather than faked.
+// Independent microstructure data requires options flow / short interest /
+// dark-pool feeds, so every signal stays unavailable until one is connected.
+// OBV is price-derived and belongs to the technical family.
 const LIVE_MICRO_AVAILABILITY: Record<string, boolean> = {
-  [MICRO_SIGNAL.accumulation]: true,
   [MICRO_SIGNAL.unusualCall]: false,
   [MICRO_SIGNAL.shortFuel]: false,
   [MICRO_SIGNAL.darkPool]: false,
@@ -74,7 +73,7 @@ export function buildLiveTicker(
     unusualCallActivity: false,
     darkPoolAccumulation: false,
     putCallShift: 0,
-    obvRising: tech.obvRising, // free microstructure signal (volume accumulation)
+    obvRising: tech.obvRising, // price-derived technical signal
 
     // Sentiment — real where a source filled it; per-signal availability marks
     // the rest (Reddit, Google Trends) as "no data".
@@ -89,13 +88,14 @@ export function buildLiveTicker(
     sectorNarrative: false,
 
     impliedVolatilityPctile: 0,
+    instrumentDataAvailable: false,
 
     sample: false,
     source: opts.source,
     availability: {
       technical: true,
       fundamental: !!f,
-      microstructure: true, // volume-accumulation (OBV) is always available
+      microstructure: false,
       sentiment: !!sent,
       macro: macroHasData,
     },

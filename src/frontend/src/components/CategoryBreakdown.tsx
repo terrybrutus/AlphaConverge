@@ -53,6 +53,9 @@ export function CategoryBreakdown({ category }: { category: CategoryResult }) {
           className={`font-mono font-bold tabular-nums ${scoreTone(category.score)}`}
         >
           {category.score}
+          <span className="ml-2 text-[10px] font-normal text-muted-foreground">
+            {category.coverage}% covered
+          </span>
         </span>
       </div>
 

@@ -33,7 +33,7 @@ export interface TickerRaw {
   // 4. Sentiment
   redditMentionVelocity: number; // z-score
   newsSentiment: number; // -1..1
-  analystUpgrade: boolean;
+  analystUpgrade: boolean; // compatibility/context only; excluded from scoring
   googleTrendsSlope: number; // -1..1
 
   // 5. Macro / sector alignment
@@ -43,6 +43,7 @@ export interface TickerRaw {
 
   // Instrument selection input
   impliedVolatilityPctile: number; // 0..100
+  instrumentDataAvailable?: boolean; // options liquidity/spread/volatility sourced
 
   // Provenance: true => illustrative preview, not from a live provider
   sample: boolean;
@@ -99,7 +100,8 @@ export interface CategoryResult {
   key: CategoryKey;
   label: string;
   score: number; // 0..100
-  aligned: boolean; // counts toward convergence
+  coverage: number; // 0..100 of the intended category backed by real data
+  aligned: boolean; // strong enough and sufficiently covered
   available: boolean; // false => no data source connected for this category
   signals: SignalLine[];
 }
@@ -111,15 +113,16 @@ export interface Play {
   price: number;
   priceHistory: number[];
   convergenceScore: number; // 0..100
-  categoriesAligned: number; // 0..5
+  categoriesAligned: number; // independent evidence families aligned, 0..4
   categories: CategoryResult[];
   stage: Stage;
   instrument: Instrument;
   instrumentRationale: string;
   thesis: string; // plain-language "why now"
   fatigueWarning: string | null;
-  surfaced: boolean; // >= 4 categories aligned
+  surfaced: boolean; // technical + >=2 independent non-price families
   sample: boolean;
   source?: string; // where the underlying data came from
   categoriesWithData: number; // how many of the 5 categories have a live source
+  dataCoverage: number; // weighted coverage across independent evidence, 0..100
 }

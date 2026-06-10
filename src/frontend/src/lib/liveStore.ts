@@ -4,6 +4,7 @@ import {
   type BtSample,
   aggregate,
   backtestCandles,
+  backtestCoverage,
 } from "@/lib/backtest";
 import { scoreTicker } from "@/lib/convergence";
 import { buildLiveTicker } from "@/lib/liveTicker";
@@ -19,7 +20,7 @@ import {
 import { twelveDataProvider } from "@/lib/providers/twelveData";
 import type { Play } from "@/types/ticker";
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 export interface LiveEntry {
   status: "loading" | "ok" | "error";
@@ -40,6 +41,8 @@ export interface BacktestState {
   progress: { done: number; total: number };
   error?: string;
   result?: BtResult;
+  failures: Array<{ symbol: string; error: string }>;
+  succeeded: number;
 }
 
 interface LiveState {
@@ -55,8 +58,10 @@ interface LiveState {
   setFinnhubKey: (key: string) => void;
   setAiKey: (key: string) => void;
   setPriceProvider: (p: PriceProvider) => void;
+  clearUserSession: () => void;
   addSymbol: (symbol: string) => void;
   loadSymbols: (symbols: string[]) => Promise<void>;
+  replaceSymbols: (symbols: string[]) => void;
   removeSymbol: (symbol: string) => void;
   refreshOne: (symbol: string) => Promise<void>;
   refreshAll: () => Promise<void>;
@@ -81,6 +86,11 @@ function scanDelayMs(p: PriceProvider): number {
 const BATCH_SIZE = 5;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const memoryStorage = {
+  getItem: (_name: string) => null,
+  setItem: (_name: string, _value: string) => undefined,
+  removeItem: (_name: string) => undefined,
+};
 
 export const useLiveStore = create<LiveState>()(
   persist(
@@ -92,7 +102,12 @@ export const useLiveStore = create<LiveState>()(
       symbols: [],
       entries: {},
       aiNotes: {},
-      backtest: { status: "idle", progress: { done: 0, total: 0 } },
+      backtest: {
+        status: "idle",
+        progress: { done: 0, total: 0 },
+        failures: [],
+        succeeded: 0,
+      },
 
       setApiKey: (key) =>
         set((s) => ({
@@ -101,6 +116,21 @@ export const useLiveStore = create<LiveState>()(
       setFinnhubKey: (key) => set({ finnhubKey: key.trim() }),
       setAiKey: (key) => set({ aiKey: key.trim() }),
       setPriceProvider: (p) => set({ priceProvider: p }),
+      clearUserSession: () =>
+        set({
+          apiKey: "",
+          finnhubKey: "",
+          aiKey: "",
+          symbols: [],
+          entries: {},
+          aiNotes: {},
+          backtest: {
+            status: "idle",
+            progress: { done: 0, total: 0 },
+            failures: [],
+            succeeded: 0,
+          },
+        }),
 
       analyze: async (play) => {
         const { aiKey } = get();
@@ -158,6 +188,17 @@ export const useLiveStore = create<LiveState>()(
         });
         await get().refreshAll();
       },
+
+      replaceSymbols: (raw) =>
+        set({
+          symbols: Array.from(
+            new Set(
+              raw.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean),
+            ),
+          ),
+          entries: {},
+          aiNotes: {},
+        }),
 
       removeSymbol: (symbol) =>
         set((s) => {
@@ -294,6 +335,8 @@ export const useLiveStore = create<LiveState>()(
             backtest: {
               status: "error",
               progress: { done: 0, total: 0 },
+              failures: [],
+              succeeded: 0,
               error: `Add your ${provider.name} API key first.`,
             },
           });
@@ -304,6 +347,8 @@ export const useLiveStore = create<LiveState>()(
             backtest: {
               status: "error",
               progress: { done: 0, total: 0 },
+              failures: [],
+              succeeded: 0,
               error: "No tickers to backtest.",
             },
           });
@@ -313,50 +358,76 @@ export const useLiveStore = create<LiveState>()(
           backtest: {
             status: "running",
             progress: { done: 0, total: symbols.length },
+            failures: [],
+            succeeded: 0,
           },
         });
         const delay = scanDelayMs(priceProvider);
         const samples: BtSample[] = [];
+        const failures: Array<{ symbol: string; error: string }> = [];
+        let succeeded = 0;
         for (let i = 0; i < symbols.length; i++) {
           try {
             const candles = await provider.weeklyCandles(symbols[i], apiKey);
-            samples.push(...backtestCandles(symbols[i], candles, horizon));
-          } catch {
-            // skip tickers that fail / rate-limit; the run continues
+            const tickerSamples = backtestCandles(symbols[i], candles, horizon);
+            if (tickerSamples.length === 0) {
+              failures.push({
+                symbol: symbols[i],
+                error: "Not enough history for this horizon.",
+              });
+            } else {
+              samples.push(...tickerSamples);
+              succeeded++;
+            }
+          } catch (e) {
+            failures.push({
+              symbol: symbols[i],
+              error: (e as Error).message,
+            });
           }
           set((s) => ({
             backtest: {
               ...s.backtest,
               progress: { done: i + 1, total: symbols.length },
+              failures: [...failures],
+              succeeded,
             },
           }));
           if (i < symbols.length - 1) await sleep(delay);
         }
+        const result =
+          samples.length > 0 ? aggregate(samples, horizon) : undefined;
+        const coverage = backtestCoverage(
+          succeeded,
+          symbols.length,
+          result?.baseline.effectiveCount ?? 0,
+        );
         set({
           backtest: {
-            status: "done",
+            status: coverage.usable ? "done" : "error",
             progress: { done: symbols.length, total: symbols.length },
-            result: aggregate(samples, horizon),
+            failures,
+            succeeded,
+            result,
+            error: coverage.error,
           },
         });
       },
     }),
     {
       name: "alphaconverge-live",
-      version: 1,
-      // v0 used a single `apiKey` shared across providers — migrate it onto the
-      // Alpha Vantage slot so existing users don't lose their saved key.
-      migrate: (persisted: unknown, version: number) => {
-        const p = (persisted ?? {}) as Record<string, unknown>;
-        if (version < 1 && typeof p.apiKey === "string") {
-          p.priceKeys = { alphaVantage: p.apiKey, twelveData: "" };
-        }
-        return p as unknown as LiveState;
+      version: 2,
+      storage: createJSONStorage(() =>
+        typeof localStorage === "undefined" ? memoryStorage : localStorage,
+      ),
+      migrate: (persisted) => {
+        const prior = persisted as Partial<LiveState>;
+        return {
+          priceProvider: prior.priceProvider ?? "alphaVantage",
+          symbols: prior.symbols ?? [],
+        } as LiveState;
       },
       partialize: (s) => ({
-        priceKeys: s.priceKeys,
-        finnhubKey: s.finnhubKey,
-        aiKey: s.aiKey,
         priceProvider: s.priceProvider,
         symbols: s.symbols,
       }),

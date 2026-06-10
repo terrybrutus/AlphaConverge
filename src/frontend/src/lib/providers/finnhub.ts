@@ -38,11 +38,6 @@ async function getJson(url: string): Promise<unknown> {
   return res.json();
 }
 
-function num(v: unknown): number | undefined {
-  const n = typeof v === "string" ? Number(v) : (v as number);
-  return typeof n === "number" && Number.isFinite(n) ? n : undefined;
-}
-
 export async function fetchFundamentals(
   symbol: string,
   apiKey: string,
@@ -59,20 +54,7 @@ export async function fetchFundamentals(
     [FUND_SIGNAL.inst]: false,
   };
 
-  // 1. Metrics — validate the key here (first call) and derive revenue accel.
-  const metric = (await getJson(
-    `${BASE}/stock/metric?symbol=${sym}&metric=all&token=${key}`,
-  )) as { metric?: Record<string, unknown> };
-  const m = metric.metric ?? {};
-  const ttmYoY = num(m.revenueGrowthTTMYoy);
-  const fiveY = num(m.revenueGrowth5Y);
-  if (ttmYoY !== undefined && fiveY !== undefined) {
-    // Is current growth outpacing its own 5-year trend? (percentage points)
-    fields.revenueGrowthAccel = ttmYoY - fiveY;
-    availability[FUND_SIGNAL.revAccel] = true;
-  }
-
-  // 2. Insider transactions — purchase in the last 90 days.
+  // Insider transactions — purchase in the last 90 days.
   try {
     const insider = (await getJson(
       `${BASE}/stock/insider-transactions?symbol=${sym}&token=${key}`,
@@ -89,34 +71,6 @@ export async function fetchFundamentals(
     );
     fields.insiderBuy90d = bought;
     availability[FUND_SIGNAL.insider] = true;
-  } catch {
-    // leave unavailable
-  }
-
-  // 3. Analyst recommendation trend — direction of the latest revision.
-  try {
-    const recs = (await getJson(
-      `${BASE}/stock/recommendation?symbol=${sym}&token=${key}`,
-    )) as Array<{
-      period?: string;
-      strongBuy?: number;
-      buy?: number;
-      hold?: number;
-      sell?: number;
-      strongSell?: number;
-    }>;
-    if (Array.isArray(recs) && recs.length >= 2) {
-      // recs are newest-first
-      const score = (r: (typeof recs)[number]) =>
-        (r.strongBuy ?? 0) * 2 +
-        (r.buy ?? 0) -
-        (r.sell ?? 0) -
-        (r.strongSell ?? 0) * 2;
-      const delta = score(recs[0]) - score(recs[1]);
-      // Normalize to -1..1-ish.
-      fields.estimateRevision = Math.max(-1, Math.min(1, delta / 5));
-      availability[FUND_SIGNAL.estRev] = true;
-    }
   } catch {
     // leave unavailable
   }
@@ -193,7 +147,6 @@ export async function fetchSentiment(
   const availability: Record<string, boolean> = {
     [SENT_SIGNAL.reddit]: false, // Reddit API is CORS-blocked from the browser
     [SENT_SIGNAL.news]: false,
-    [SENT_SIGNAL.analyst]: false,
     [SENT_SIGNAL.trends]: false, // Google Trends has no browser-usable API
   };
 
@@ -208,29 +161,6 @@ export async function fetchSentiment(
         .map((n) => `${n.headline ?? ""} ${n.summary ?? ""}`);
       fields.newsSentiment = headlineSentiment(headlines);
       availability[SENT_SIGNAL.news] = true;
-    }
-  } catch {
-    // leave unavailable
-  }
-
-  // Analyst upgrade: recommendation trend improved vs the prior period.
-  try {
-    const recs = (await getJson(
-      `${BASE}/stock/recommendation?symbol=${sym}&token=${key}`,
-    )) as Array<{
-      strongBuy?: number;
-      buy?: number;
-      sell?: number;
-      strongSell?: number;
-    }>;
-    if (Array.isArray(recs) && recs.length >= 2) {
-      const score = (r: (typeof recs)[number]) =>
-        (r.strongBuy ?? 0) * 2 +
-        (r.buy ?? 0) -
-        (r.sell ?? 0) -
-        (r.strongSell ?? 0) * 2;
-      fields.analystUpgrade = score(recs[0]) - score(recs[1]) > 0;
-      availability[SENT_SIGNAL.analyst] = true;
     }
   } catch {
     // leave unavailable

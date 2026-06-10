@@ -1,3 +1,4 @@
+import { CredentialVault } from "@/components/CredentialVault";
 import { PlayCard } from "@/components/PlayCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,6 +111,10 @@ export function LivePanel() {
         Finnhub key to also source Fundamentals (insider buys, revenue accel)
         and Sentiment (news, analyst trend).
       </p>
+      <p className="text-xs text-muted-foreground mb-4">
+        API keys stay in memory for this browser session only. They are not sent
+        to or stored by the ICP canister.
+      </p>
 
       {/* Price source */}
       <div className="mb-4">
@@ -170,7 +175,8 @@ export function LivePanel() {
       ) : (
         <div className="flex items-center justify-between mb-4 text-sm">
           <span className="text-muted-foreground">
-            <KeyRound className="w-3.5 h-3.5 inline mr-1" /> Price key saved
+            <KeyRound className="w-3.5 h-3.5 inline mr-1" /> Price key active
+            this session
           </span>
           <button
             type="button"
@@ -224,7 +230,7 @@ export function LivePanel() {
         <div className="flex items-center justify-between mb-4 text-sm">
           <span className="text-muted-foreground">
             <KeyRound className="w-3.5 h-3.5 inline mr-1" /> Fundamentals key
-            saved
+            active this session
           </span>
           <button
             type="button"
@@ -235,6 +241,9 @@ export function LivePanel() {
           </button>
         </div>
       )}
+
+      {/* Add symbol */}
+      <CredentialVault />
 
       {/* Add symbol */}
       <form onSubmit={submitSymbol} className="flex gap-2 mb-4">
@@ -368,7 +377,7 @@ export function LivePanel() {
       {liveSurfaced.length > 0 && (
         <div className="mt-4">
           <h3 className="font-display text-base font-semibold text-primary mb-2">
-            Surfaced ({liveSurfaced.length}) — 4+ dimensions converging
+            Surfaced ({liveSurfaced.length}) — independent evidence confirmed
           </h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {liveSurfaced.map((play, i) => (

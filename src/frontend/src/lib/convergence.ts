@@ -12,19 +12,24 @@ import type {
 // weighted signal score crosses this threshold.
 const ALIGN_THRESHOLD = 50;
 
-// A ticker is surfaced as a Play once at least this many of the six dimensions
-// (five scored categories + a valid lifecycle stage) align simultaneously.
-const SURFACE_MIN_DIMENSIONS = 4;
+const MIN_CATEGORY_COVERAGE = 50;
 
-// Blend weights for the headline convergence score. Technical and fundamental
-// carry the most weight because they define the structural setup; the others
-// confirm it.
-const CATEGORY_BLEND: Record<CategoryKey, number> = {
-  technical: 0.28,
-  fundamental: 0.26,
-  microstructure: 0.18,
-  macro: 0.16,
-  sentiment: 0.12,
+// Price structure contains every price/volume-derived fact, including OBV and
+// lifecycle stage. Macro is context, not a company-specific confirmation.
+const COMPANY_CONFIRMATION_KEYS: CategoryKey[] = [
+  "fundamental",
+  "microstructure",
+  "sentiment",
+];
+const MIN_COMPANY_CONFIRMATIONS = 2;
+
+// Only independent evidence families contribute to the headline convergence
+// score. Macro remains visible context but cannot inflate convergence.
+const EVIDENCE_BLEND: Record<Exclude<CategoryKey, "macro">, number> = {
+  technical: 0.32,
+  fundamental: 0.28,
+  microstructure: 0.24,
+  sentiment: 0.16,
 };
 
 function clamp(n: number, lo: number, hi: number): number {
@@ -46,7 +51,6 @@ export const FUND_SIGNAL = {
 export const SENT_SIGNAL = {
   reddit: "Reddit mention spike",
   news: "News sentiment positive",
-  analyst: "Analyst upgrade / initiation",
   trends: "Search interest rising",
 } as const;
 
@@ -61,7 +65,6 @@ export const MACRO_SIGNAL = {
 export const MICRO_SIGNAL = {
   unusualCall: "Unusual call activity",
   shortFuel: "Short-squeeze fuel",
-  accumulation: "Volume accumulation",
   darkPool: "Dark-pool accumulation",
   putCall: "Put/call shift to calls",
 } as const;
@@ -89,20 +92,29 @@ function scoreCategory(
       key,
       label,
       score: 0,
+      coverage: 0,
       aligned: false,
       available: false,
       signals: signals.map((s) => ({ ...s, fired: false })),
     };
   }
-  const totalWeight = usable.reduce((s, x) => s + x.weight, 0);
+  const sourcedWeight = usable.reduce((s, x) => s + x.weight, 0);
+  const intendedWeight = signals.reduce((s, x) => s + x.weight, 0);
   const firedWeight = usable.reduce((s, x) => s + (x.fired ? x.weight : 0), 0);
+  // Missing signals remain unknown and contribute no points. Do not
+  // renormalize a single available positive signal into a misleading 100.
   const score =
-    totalWeight === 0 ? 0 : Math.round((firedWeight / totalWeight) * 100);
+    intendedWeight === 0 ? 0 : Math.round((firedWeight / intendedWeight) * 100);
+  const coverage =
+    intendedWeight === 0
+      ? 0
+      : Math.round((sourcedWeight / intendedWeight) * 100);
   return {
     key,
     label,
     score,
-    aligned: score >= ALIGN_THRESHOLD,
+    coverage,
+    aligned: score >= ALIGN_THRESHOLD && coverage >= MIN_CATEGORY_COVERAGE,
     available: true,
     signals,
   };
@@ -115,7 +127,7 @@ function technical(t: TickerRaw): CategoryResult {
       name: "Base formation",
       detail:
         "Price compressed into a tight range on contracting volume after a decline — the market has stopped caring, which is where quiet accumulation happens.",
-      weight: 0.25,
+      weight: 0.2,
       fired: baseFormation,
       value: `${Math.round(t.volumeContraction * 100)}% volume dry-up`,
     },
@@ -144,8 +156,15 @@ function technical(t: TickerRaw): CategoryResult {
       name: "At major support",
       detail:
         "Trading into a major historical support level where buyers have stepped in before.",
-      weight: 0.15,
+      weight: 0.1,
       fired: t.nearMajorSupport,
+    },
+    {
+      name: "Volume accumulation (OBV)",
+      detail:
+        "On-Balance-Volume is trending up. Because it is derived from price and volume, it belongs to the price-structure family rather than an independent microstructure vote.",
+      weight: 0.1,
+      fired: t.obvRising,
     },
   ];
   return scoreCategory(
@@ -223,7 +242,7 @@ function microstructure(t: TickerRaw): CategoryResult {
       name: MICRO_SIGNAL.unusualCall,
       detail:
         "Out-of-the-money call buying well above normal volume, weeks before expiry — a smart-money tell.",
-      weight: 0.3,
+      weight: 0.35,
       fired: t.unusualCallActivity,
       available: signalAvailable(t, MICRO_SIGNAL.unusualCall),
     },
@@ -231,24 +250,16 @@ function microstructure(t: TickerRaw): CategoryResult {
       name: MICRO_SIGNAL.shortFuel,
       detail:
         "Elevated short interest. On any positive catalyst, shorts must buy to cover — a force multiplier.",
-      weight: 0.25,
+      weight: 0.3,
       fired: t.shortInterestPct >= 15,
       value: `${t.shortInterestPct.toFixed(0)}% short`,
       available: signalAvailable(t, MICRO_SIGNAL.shortFuel),
     },
     {
-      name: MICRO_SIGNAL.accumulation,
-      detail:
-        "On-Balance-Volume is trending up — volume is flowing into up-weeks, a sign of quiet accumulation.",
-      weight: 0.2,
-      fired: t.obvRising,
-      available: signalAvailable(t, MICRO_SIGNAL.accumulation),
-    },
-    {
       name: MICRO_SIGNAL.darkPool,
       detail:
         "Large off-exchange prints consistent with quiet institutional buying.",
-      weight: 0.15,
+      weight: 0.2,
       fired: t.darkPoolAccumulation,
       available: signalAvailable(t, MICRO_SIGNAL.darkPool),
     },
@@ -256,7 +267,7 @@ function microstructure(t: TickerRaw): CategoryResult {
       name: MICRO_SIGNAL.putCall,
       detail:
         "Options positioning is rotating toward calls relative to its baseline.",
-      weight: 0.1,
+      weight: 0.15,
       fired: t.putCallShift < -0.2,
       available: signalAvailable(t, MICRO_SIGNAL.putCall),
     },
@@ -275,7 +286,7 @@ function sentiment(t: TickerRaw): CategoryResult {
       name: SENT_SIGNAL.reddit,
       detail:
         "Mention velocity on r/wallstreetbets / r/stocks is well above its trailing baseline.",
-      weight: 0.3,
+      weight: 0.4,
       fired: t.redditMentionVelocity >= 1,
       value: `${t.redditMentionVelocity.toFixed(1)}σ`,
       available: signalAvailable(t, SENT_SIGNAL.reddit),
@@ -283,21 +294,14 @@ function sentiment(t: TickerRaw): CategoryResult {
     {
       name: SENT_SIGNAL.news,
       detail: "Recent-headline sentiment has turned net-positive.",
-      weight: 0.25,
+      weight: 0.35,
       fired: t.newsSentiment > 0.15,
       available: signalAvailable(t, SENT_SIGNAL.news),
     },
     {
-      name: SENT_SIGNAL.analyst,
-      detail: "Analyst recommendation trend improved versus the prior period.",
-      weight: 0.25,
-      fired: t.analystUpgrade,
-      available: signalAvailable(t, SENT_SIGNAL.analyst),
-    },
-    {
       name: SENT_SIGNAL.trends,
       detail: "Google Trends for the ticker is sloping up.",
-      weight: 0.2,
+      weight: 0.25,
       fired: t.googleTrendsSlope > 0.15,
       available: signalAvailable(t, SENT_SIGNAL.trends),
     },
@@ -387,6 +391,14 @@ function chooseInstrument(
         "Too few independent categories agree right now. Watch it, don't commit capital.",
     };
   }
+  const hasInstrumentData = t.sample || t.instrumentDataAvailable === true;
+  if (!hasInstrumentData && stage !== "earlyTrend") {
+    return {
+      instrument: "pass",
+      rationale:
+        "The stock setup may be valid, but no live options/volatility source is connected. AlphaConverge will not recommend an options instrument without that data.",
+    };
+  }
   const richPremiumAtSupport =
     t.impliedVolatilityPctile >= 70 && t.nearMajorSupport;
   switch (stage) {
@@ -448,7 +460,8 @@ function buildThesis(
   t: TickerRaw,
   stage: Stage,
   categories: CategoryResult[],
-  dimensionsAligned: number,
+  evidenceAligned: number,
+  surfaced: boolean,
 ): string {
   const fired: string[] = [];
   for (const c of categories) {
@@ -458,10 +471,10 @@ function buildThesis(
   }
   const top = fired.slice(0, 5);
   const stageText = STAGE_LABEL[stage].toLowerCase();
-  if (dimensionsAligned < SURFACE_MIN_DIMENSIONS) {
-    return `Only ${dimensionsAligned} of 6 dimensions align on ${t.symbol}. Not enough independent confirmation to call this a setup — it stays on the watch list.`;
+  if (!surfaced) {
+    return `${evidenceAligned} independent evidence families align on ${t.symbol}, but a Play requires technical structure plus at least two sufficiently covered, non-price company evidence families. Price-derived signals count together, lifecycle stage is descriptive, and macro is context rather than another vote.`;
   }
-  const lead = `${dimensionsAligned} of 6 dimensions converge on ${t.symbol} (${t.name}), currently in a ${stageText}.`;
+  const lead = `${evidenceAligned} independent evidence families converge on ${t.symbol} (${t.name}), currently in a ${stageText}.`;
   const body =
     top.length > 0
       ? ` The agreeing signals: ${top.join(", ")}. Independent categories pointing the same way is the edge — any one alone is noise.`
@@ -477,30 +490,34 @@ export function scoreTicker(t: TickerRaw): Play {
     sentiment(t),
     macro(t),
   ];
-  const categoriesAlignedCount = categories.filter((c) => c.aligned).length;
   const stage = classifyStage(t);
-  const stageValid = stage !== "none";
-  const dimensionsAligned = categoriesAlignedCount + (stageValid ? 1 : 0);
-  const surfaced = dimensionsAligned >= SURFACE_MIN_DIMENSIONS;
+  const technicalAligned =
+    categories.find((c) => c.key === "technical")?.aligned ?? false;
+  const companyConfirmations = categories.filter(
+    (c) => COMPANY_CONFIRMATION_KEYS.includes(c.key) && c.aligned,
+  ).length;
+  const evidenceAligned = (technicalAligned ? 1 : 0) + companyConfirmations;
+  const surfaced =
+    technicalAligned && companyConfirmations >= MIN_COMPANY_CONFIRMATIONS;
 
-  // Score only the categories that actually have data, renormalizing their
-  // weights — so "no data" categories don't drag the number down. Coverage is
-  // communicated separately via dimensions aligned (X/6).
-  const availCats = categories.filter((c) => c.available);
-  const weightSum = availCats.reduce((s, c) => s + CATEGORY_BLEND[c.key], 0);
-  const convergenceScore =
-    weightSum > 0
-      ? Math.round(
-          clamp(
-            availCats.reduce(
-              (sum, c) => sum + c.score * CATEGORY_BLEND[c.key],
-              0,
-            ) / weightSum,
-            0,
-            100,
-          ),
-        )
-      : 0;
+  const convergenceScore = Math.round(
+    clamp(
+      categories.reduce(
+        (sum, c) =>
+          c.key === "macro" ? sum : sum + c.score * EVIDENCE_BLEND[c.key],
+        0,
+      ),
+      0,
+      100,
+    ),
+  );
+  const dataCoverage = Math.round(
+    categories.reduce(
+      (sum, c) =>
+        c.key === "macro" ? sum : sum + c.coverage * EVIDENCE_BLEND[c.key],
+      0,
+    ),
+  );
 
   const { instrument, rationale } = chooseInstrument(stage, t, surfaced);
 
@@ -511,17 +528,18 @@ export function scoreTicker(t: TickerRaw): Play {
     price: t.price,
     priceHistory: t.priceHistory,
     convergenceScore,
-    categoriesAligned: dimensionsAligned,
+    categoriesAligned: evidenceAligned,
     categories,
     stage,
     instrument,
     instrumentRationale: rationale,
-    thesis: buildThesis(t, stage, categories, dimensionsAligned),
+    thesis: buildThesis(t, stage, categories, evidenceAligned, surfaced),
     fatigueWarning: buildFatigueWarning(stage, t),
     surfaced,
     sample: t.sample,
     source: t.source,
     categoriesWithData: categories.filter((c) => c.available).length,
+    dataCoverage,
   };
 }
 

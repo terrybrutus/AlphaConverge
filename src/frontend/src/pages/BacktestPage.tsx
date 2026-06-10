@@ -30,18 +30,32 @@ function StatRow({
   s: Stat;
   baseline: number;
 }) {
+  const returnInterval =
+    s.confidence95 === null
+      ? "95% confidence interval unavailable (fewer than 2 independent periods)"
+      : `95% confidence interval: ${pct(s.avgReturn - s.confidence95)} to ${pct(s.avgReturn + s.confidence95)}`;
+  const winRateInterval =
+    s.winRateLow95 === null || s.winRateHigh95 === null
+      ? "95% confidence interval unavailable (fewer than 2 independent periods)"
+      : `95% confidence interval: ${rate(s.winRateLow95)} to ${rate(s.winRateHigh95)}`;
   return (
     <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center px-3 py-2 border-b border-border last:border-0 text-sm">
       <span className="text-foreground">{label}</span>
       <span className="font-mono text-muted-foreground tabular-nums w-16 text-right">
-        n={s.count}
+        <span title={`${s.effectiveCount} independent time periods`}>
+          n={s.count}
+        </span>
       </span>
       <span
         className={`font-mono tabular-nums w-20 text-right ${tone(s.avgReturn, baseline)}`}
+        title={returnInterval}
       >
         {s.count ? pct(s.avgReturn) : "—"}
       </span>
-      <span className="font-mono text-muted-foreground tabular-nums w-14 text-right">
+      <span
+        className="font-mono text-muted-foreground tabular-nums w-14 text-right"
+        title={winRateInterval}
+      >
         {s.count ? rate(s.winRate) : "—"}
       </span>
     </div>
@@ -50,7 +64,7 @@ function StatRow({
 
 function Verdict({ result }: { result: BtResult }) {
   const top = result.buckets[result.buckets.length - 1];
-  const enough = top.count >= 20;
+  const enough = top.effectiveCount >= 20;
   const beatsBaseline = top.avgReturn > result.baseline.avgReturn;
   const alignedBeats = result.aligned.avgReturn > result.notAligned.avgReturn;
 
@@ -123,10 +137,11 @@ export function BacktestPage() {
               and macro can't be reconstructed historically on free data.
             </p>
             <p>
-              Uses weekly end-of-day data. Samples overlap (not independent),
-              and the universe is today's liquid names (survivorship bias) —
-              both flatter results. This is a sanity check, not proof, and not
-              investment advice.
+              Uses non-overlapping weekly samples to reduce false confidence. A
+              verdict requires at least 70% ticker coverage and 20 independent
+              time periods. The universe is today's liquid names (survivorship
+              bias), and confidence intervals remain approximate. This is a
+              sanity check, not proof, and not investment advice.
             </p>
           </div>
         </div>
@@ -211,6 +226,28 @@ export function BacktestPage() {
           {backtest.status === "error" && (
             <p className="text-sm text-destructive">{backtest.error}</p>
           )}
+          {backtest.progress.total > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Tested {backtest.succeeded}/{backtest.progress.total} tickers.
+              {backtest.failures.length > 0 &&
+                ` ${backtest.failures.length} failed and are listed below.`}
+            </p>
+          )}
+          {backtest.failures.length > 0 && (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs">
+              <p className="font-semibold text-destructive mb-1">
+                Failed tickers
+              </p>
+              {backtest.failures.map((failure) => (
+                <p key={failure.symbol} className="text-muted-foreground">
+                  <span className="font-mono text-foreground">
+                    {failure.symbol}
+                  </span>
+                  : {failure.error}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Results */}
@@ -234,7 +271,9 @@ export function BacktestPage() {
                     Forward return by technical-convergence score
                   </h2>
                   <p className="text-xs text-muted-foreground mb-3">
-                    {result.total.toLocaleString()} weekly samples ·{" "}
+                    {result.total.toLocaleString()} observations across{" "}
+                    {result.baseline.effectiveCount.toLocaleString()} independent
+                    time periods ·{" "}
                     {result.horizon}-week forward return · baseline (avg of all
                     weeks){" "}
                     <span className="font-mono">
@@ -244,6 +283,8 @@ export function BacktestPage() {
                     <span className="font-mono">
                       {rate(result.baseline.winRate)}
                     </span>
+                    . Hover a return or win rate for its approximate 95%
+                    confidence interval.
                   </p>
                   <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 px-3 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
                     <span>Score bucket</span>

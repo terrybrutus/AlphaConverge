@@ -3,21 +3,24 @@
 A stock-market **signal-convergence engine** built on Caffeine / ICP.
 
 Most screeners show you one thing at a time — a chart, a P/E, a Reddit mention.
-AlphaConverge does the opposite: it scores every ticker across **six independent
-categories** and only surfaces a setup when several of them agree at the same
-time. Independent signals pointing the same direction is the edge; any one alone
-is noise.
+AlphaConverge does the opposite: it scores every ticker across independent
+evidence families and only surfaces a setup when price structure and multiple
+non-price company signals agree at the same time. Independent evidence pointing
+the same direction is the edge; any one source alone is noise.
 
-## The six dimensions
+## Independent evidence model
 
-1. **Technical structure** — base formations, weekly/monthly bullish divergence, first higher high, support.
+1. **Price structure** — technical structure, lifecycle stage, and OBV are one evidence family because they all come from price/volume.
 2. **Fundamental inflection** — *rate of change*: revenue acceleration, estimate revisions, valuation vs its own history, insider buying (SEC Form 4), institutional accumulation (13F), short interest.
-3. **Market microstructure** — unusual call activity, short-squeeze fuel, dark-pool prints, put/call shifts.
-4. **Sentiment** — Reddit mention velocity, news NLP, analyst upgrades, search interest.
-5. **Macro & sector** — sector ETF inflows, risk-on backdrop, narrative tailwind.
-6. **Lifecycle stage** — Capitulation → Base → Breakout → Early Trend.
+3. **Positioning / microstructure** — unusual call activity, short-squeeze fuel, dark-pool prints, put/call shifts.
+4. **Sentiment** — Reddit mention velocity, news NLP, and search interest. Analyst recommendations do not count here because they overlap with fundamental estimate/revision evidence.
+5. **Macro & sector context** — sector ETF relative strength, risk-on backdrop, narrative tailwind. This is displayed separately and cannot increase the convergence score or confirmation count.
 
-A ticker is **surfaced as a Play** only when **≥4 of 6** dimensions converge.
+A ticker is **surfaced as a Play** only when price structure aligns and at least
+two independent, non-price company evidence families align. A category must
+also have at least 50% data coverage before it can count as aligned.
+Missing signals contribute no points; sparse positive data is never
+renormalized into a misleading 100% category score.
 
 ## The Play card
 
@@ -29,8 +32,10 @@ The centerpiece. For each surfaced ticker it states:
 - a plain-language thesis of *why now*,
 - a **fatigue warning** when the setup is structurally early (so you don't enter and grind sideways for 18 months).
 
-The stage drives the instrument: a capitulation bottom is LEAP/CSP territory, a
-confirmed breakout is near-term calls, an established trend is DCA.
+Lifecycle stage describes the setup and helps select an instrument, but it does
+not add another independent vote. Live options recommendations are withheld
+until an options source explicitly confirms volatility, liquidity, and spread
+data are available.
 
 ## Status
 
@@ -43,6 +48,13 @@ The convergence logic is real and lives in
 [`src/frontend/src/lib/convergence.ts`](./src/frontend/src/lib/convergence.ts).
 
 > Not investment advice. A research and screening tool.
+
+## ICP cycle policy
+
+Scans, provider calls, scoring, encryption, and backtests run in the browser.
+The canister handles only explicit authenticated watchlist/vault persistence;
+there are no scheduled jobs or canister HTTP outcalls. See
+[`CYCLES.md`](./CYCLES.md).
 
 ## Develop
 

@@ -1,3 +1,4 @@
+import { AccountControl } from "@/components/AccountControl";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Link, useRouterState } from "@tanstack/react-router";
@@ -71,6 +72,7 @@ export function Layout({ children }: LayoutProps) {
               </nav>
             )}
 
+            <AccountControl />
             <Button
               type="button"
               variant="ghost"
