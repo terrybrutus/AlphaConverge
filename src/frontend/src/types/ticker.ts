@@ -54,6 +54,11 @@ export interface TickerRaw {
 
   // Where the data came from, e.g. "Alpha Vantage" or "Preview".
   source?: string;
+
+  // Per-signal data availability, keyed by signal name. Omitted => available.
+  // Lets a live category expose real signals alongside ones whose data source
+  // isn't connected yet, without faking the missing ones.
+  signalAvailability?: Record<string, boolean>;
 }
 
 export type CategoryKey =
@@ -84,6 +89,9 @@ export interface SignalLine {
   fired: boolean;
   // optional numeric context for fired signals
   value?: string;
+  // false => no data behind this specific signal; excluded from scoring and
+  // shown as "no data" rather than "not present".
+  available?: boolean;
 }
 
 export interface CategoryResult {

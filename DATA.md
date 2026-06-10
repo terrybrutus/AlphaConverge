@@ -14,6 +14,15 @@ that wiring.
   volume contraction, support proximity — in
   `src/frontend/src/lib/technicals.ts`. Stage classification and the instrument
   recommendation then run on real structure.
+- **Fundamental category is partially real** (add a free Finnhub key). Via
+  `lib/providers/finnhub.ts` it sources, best-effort: **insider buying (90d)**
+  from insider transactions, **estimate-revision direction** from the analyst
+  recommendation trend, and a **revenue-growth-acceleration** proxy from
+  metrics. Sub-signals Finnhub's free tier doesn't provide (P/E-vs-5yr,
+  P/S-vs-sector, 13F institutional change) are marked **"no data"** per signal —
+  they are excluded from scoring, never faked. The authoritative source for raw
+  insider/13F detail is SEC EDGAR (keyless, but browser-blocked → needs a
+  canister HTTP outcall); wire that when you want filing-level depth.
 - **Honest by construction.** A live ticker only has data for the Technical
   category; the other four are shown as **“no source connected”** and cannot
   count toward convergence, so a live ticker won’t surface on technicals alone.

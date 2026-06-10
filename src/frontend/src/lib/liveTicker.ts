@@ -1,17 +1,24 @@
+import type { FundamentalData } from "@/lib/providers/finnhub";
 import { type Candle, computeTechnicals } from "@/lib/technicals";
 import type { TickerRaw } from "@/types/ticker";
 
-// Build a scorable TickerRaw from real price candles. Only the Technical
-// category has data; the other four are marked unavailable so the engine scores
-// them as "no source connected" rather than fabricating signals. As more live
-// providers are wired (fundamentals, sentiment, options, macro), flip their
-// availability flags and fill the corresponding fields.
+// Build a scorable TickerRaw from real price candles (and optionally real
+// fundamentals). Categories without a connected source are marked unavailable so
+// the engine scores them as "no source" rather than fabricating signals. As more
+// live providers are wired (sentiment, options, macro), flip their availability
+// flags and fill the corresponding fields.
 export function buildLiveTicker(
   symbol: string,
   candles: Candle[],
-  opts: { name?: string; sector?: string; source: string },
+  opts: {
+    name?: string;
+    sector?: string;
+    source: string;
+    fundamentals?: FundamentalData;
+  },
 ): TickerRaw {
   const tech = computeTechnicals(candles);
+  const f = opts.fundamentals;
 
   return {
     symbol: symbol.toUpperCase(),
@@ -28,14 +35,14 @@ export function buildLiveTicker(
     firstHigherHigh: tech.firstHigherHigh,
     nearMajorSupport: tech.nearMajorSupport,
 
-    // Other categories — no live source yet. Neutral values; availability marks
-    // them as unknown so they never fire.
-    revenueGrowthAccel: 0,
-    estimateRevision: 0,
-    peVs5yrAvg: 0,
-    psVsSector: 0,
-    insiderBuy90d: false,
-    instOwnershipChange: 0,
+    // Fundamental — real where a source filled it; per-signal availability
+    // (signalAvailability) marks the rest as "no data".
+    revenueGrowthAccel: f?.fields.revenueGrowthAccel ?? 0,
+    estimateRevision: f?.fields.estimateRevision ?? 0,
+    peVs5yrAvg: f?.fields.peVs5yrAvg ?? 0,
+    psVsSector: f?.fields.psVsSector ?? 0,
+    insiderBuy90d: f?.fields.insiderBuy90d ?? false,
+    instOwnershipChange: f?.fields.instOwnershipChange ?? 0,
     shortInterestPct: 0,
 
     unusualCallActivity: false,
@@ -57,10 +64,11 @@ export function buildLiveTicker(
     source: opts.source,
     availability: {
       technical: true,
-      fundamental: false,
+      fundamental: !!f,
       microstructure: false,
       sentiment: false,
       macro: false,
     },
+    signalAvailability: f?.availability,
   };
 }

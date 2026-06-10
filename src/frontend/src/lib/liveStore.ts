@@ -1,6 +1,10 @@
 import { scoreTicker } from "@/lib/convergence";
 import { buildLiveTicker } from "@/lib/liveTicker";
 import { alphaVantageProvider } from "@/lib/providers/alphaVantage";
+import {
+  type FundamentalData,
+  fetchFundamentals,
+} from "@/lib/providers/finnhub";
 import type { Play } from "@/types/ticker";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
@@ -12,10 +16,12 @@ export interface LiveEntry {
 }
 
 interface LiveState {
-  apiKey: string;
+  apiKey: string; // Alpha Vantage (price/technical)
+  finnhubKey: string; // Finnhub (fundamentals) — optional
   symbols: string[];
   entries: Record<string, LiveEntry>;
   setApiKey: (key: string) => void;
+  setFinnhubKey: (key: string) => void;
   addSymbol: (symbol: string) => void;
   removeSymbol: (symbol: string) => void;
   refreshOne: (symbol: string) => Promise<void>;
@@ -28,10 +34,12 @@ export const useLiveStore = create<LiveState>()(
   persist(
     (set, get) => ({
       apiKey: "",
+      finnhubKey: "",
       symbols: [],
       entries: {},
 
       setApiKey: (key) => set({ apiKey: key.trim() }),
+      setFinnhubKey: (key) => set({ finnhubKey: key.trim() }),
 
       addSymbol: (raw) => {
         const symbol = raw.trim().toUpperCase();
@@ -73,8 +81,24 @@ export const useLiveStore = create<LiveState>()(
         }));
         try {
           const candles = await provider.weeklyCandles(symbol, apiKey);
+
+          // Fundamentals are best-effort: a failure here must not sink the
+          // technical analysis, which is the core of the live ticker.
+          let fundamentals: FundamentalData | undefined;
+          let source = provider.name;
+          const { finnhubKey } = get();
+          if (finnhubKey) {
+            try {
+              fundamentals = await fetchFundamentals(symbol, finnhubKey);
+              source = `${provider.name} + Finnhub`;
+            } catch {
+              fundamentals = undefined;
+            }
+          }
+
           const ticker = buildLiveTicker(symbol, candles, {
-            source: provider.name,
+            source,
+            fundamentals,
           });
           const play = scoreTicker(ticker);
           set((s) => ({
@@ -99,7 +123,11 @@ export const useLiveStore = create<LiveState>()(
     }),
     {
       name: "alphaconverge-live",
-      partialize: (s) => ({ apiKey: s.apiKey, symbols: s.symbols }),
+      partialize: (s) => ({
+        apiKey: s.apiKey,
+        finnhubKey: s.finnhubKey,
+        symbols: s.symbols,
+      }),
     },
   ),
 );

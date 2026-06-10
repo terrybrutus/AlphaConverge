@@ -31,8 +31,23 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
+// Stable names for fundamental sub-signals, shared with the live data layer so
+// it can mark exactly which ones it sourced.
+export const FUND_SIGNAL = {
+  revAccel: "Revenue growth accelerating",
+  estRev: "Estimates revised upward",
+  peHist: "Valuation below 5-yr average",
+  psSector: "Cheaper than sector",
+  insider: "Insider buying (90d)",
+  inst: "Institutional accumulation",
+} as const;
+
 function isAvailable(t: TickerRaw, key: CategoryKey): boolean {
   return t.availability?.[key] ?? true;
+}
+
+function signalAvailable(t: TickerRaw, name: string): boolean {
+  return t.signalAvailability?.[name] ?? true;
 }
 
 function scoreCategory(
@@ -41,7 +56,9 @@ function scoreCategory(
   signals: SignalLine[],
   available: boolean,
 ): CategoryResult {
-  if (!available) {
+  // Only signals with a connected data source count toward the score.
+  const usable = signals.filter((s) => s.available !== false);
+  if (!available || usable.length === 0) {
     // No data source connected for this category — score it as unknown, never
     // fabricate a signal.
     return {
@@ -53,8 +70,8 @@ function scoreCategory(
       signals: signals.map((s) => ({ ...s, fired: false })),
     };
   }
-  const totalWeight = signals.reduce((s, x) => s + x.weight, 0);
-  const firedWeight = signals.reduce((s, x) => s + (x.fired ? x.weight : 0), 0);
+  const totalWeight = usable.reduce((s, x) => s + x.weight, 0);
+  const firedWeight = usable.reduce((s, x) => s + (x.fired ? x.weight : 0), 0);
   const score =
     totalWeight === 0 ? 0 : Math.round((firedWeight / totalWeight) * 100);
   return {
@@ -118,48 +135,54 @@ function technical(t: TickerRaw): CategoryResult {
 function fundamental(t: TickerRaw): CategoryResult {
   const signals: SignalLine[] = [
     {
-      name: "Revenue growth accelerating",
+      name: FUND_SIGNAL.revAccel,
       detail:
         "Growth rate is getting faster, not just staying positive — the inflection that precedes re-rating.",
       weight: 0.22,
       fired: t.revenueGrowthAccel > 0,
       value: `${t.revenueGrowthAccel > 0 ? "+" : ""}${t.revenueGrowthAccel.toFixed(1)} pp`,
+      available: signalAvailable(t, FUND_SIGNAL.revAccel),
     },
     {
-      name: "Estimates revised upward",
+      name: FUND_SIGNAL.estRev,
       detail:
         "Analysts are raising forecasts. Direction of revisions matters more than the absolute level.",
       weight: 0.2,
       fired: t.estimateRevision > 0.1,
+      available: signalAvailable(t, FUND_SIGNAL.estRev),
     },
     {
-      name: "Valuation below 5-yr average",
+      name: FUND_SIGNAL.peHist,
       detail:
         "Trading below its own 5-year average multiple — cheap relative to its own history, not just the market.",
       weight: 0.15,
       fired: t.peVs5yrAvg > 0 && t.peVs5yrAvg < 1,
       value: t.peVs5yrAvg > 0 ? `${t.peVs5yrAvg.toFixed(2)}x` : "n/a",
+      available: signalAvailable(t, FUND_SIGNAL.peHist),
     },
     {
-      name: "Cheaper than sector",
+      name: FUND_SIGNAL.psSector,
       detail:
         "Price-to-sales below the sector median — discounted versus peers.",
       weight: 0.13,
       fired: t.psVsSector > 0 && t.psVsSector < 1,
+      available: signalAvailable(t, FUND_SIGNAL.psSector),
     },
     {
-      name: "Insider buying (90d)",
+      name: FUND_SIGNAL.insider,
       detail:
         "Insiders bought on the open market in the last 90 days after a long quiet stretch (SEC Form 4).",
       weight: 0.18,
       fired: t.insiderBuy90d,
+      available: signalAvailable(t, FUND_SIGNAL.insider),
     },
     {
-      name: "Institutional accumulation",
+      name: FUND_SIGNAL.inst,
       detail:
         "Institutional ownership rose over the latest quarter (13F) — funds are building positions.",
       weight: 0.12,
       fired: t.instOwnershipChange > 0.5,
+      available: signalAvailable(t, FUND_SIGNAL.inst),
     },
   ];
   return scoreCategory(
