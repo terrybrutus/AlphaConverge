@@ -11,6 +11,7 @@ import {
   Plus,
   Radio,
   RefreshCw,
+  RotateCcw,
   Telescope,
   TriangleAlert,
   X,
@@ -36,7 +37,7 @@ const PRICE_PROVIDERS: Record<
 };
 
 export function LivePanel() {
-  const apiKey = useLiveStore((s) => s.apiKey);
+  const apiKey = useLiveStore((s) => s.priceKeys[s.priceProvider]);
   const finnhubKey = useLiveStore((s) => s.finnhubKey);
   const priceProvider = useLiveStore((s) => s.priceProvider);
   const symbols = useLiveStore((s) => s.symbols);
@@ -48,6 +49,8 @@ export function LivePanel() {
   const loadSymbols = useLiveStore((s) => s.loadSymbols);
   const removeSymbol = useLiveStore((s) => s.removeSymbol);
   const refreshAll = useLiveStore((s) => s.refreshAll);
+  const retryErrored = useLiveStore((s) => s.retryErrored);
+  const refreshOne = useLiveStore((s) => s.refreshOne);
 
   const [keyDraft, setKeyDraft] = useState("");
   const [editingKey, setEditingKey] = useState(false);
@@ -58,6 +61,7 @@ export function LivePanel() {
   const hasKey = apiKey.length > 0;
   const pp = PRICE_PROVIDERS[priceProvider];
   const scanning = symbols.some((s) => entries[s]?.status === "loading");
+  const erroredSymbols = symbols.filter((s) => entries[s]?.status === "error");
 
   // Ranked live results — highest convergence first, surfaced split out.
   const livePlays = symbols
@@ -122,8 +126,9 @@ export function LivePanel() {
             <button
               key={id}
               type="button"
+              disabled={scanning}
               onClick={() => setPriceProvider(id)}
-              className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-40 ${
                 priceProvider === id
                   ? "border-primary/50 bg-primary/15 text-foreground"
                   : "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
@@ -293,6 +298,17 @@ export function LivePanel() {
             free limit is too small.
           </span>
         )}
+        {erroredSymbols.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={scanning}
+            onClick={() => void retryErrored()}
+          >
+            <RotateCcw className="w-4 h-4 mr-1.5" /> Retry {erroredSymbols.length} failed
+          </Button>
+        )}
       </div>
 
       {symbols.length === 0 && (
@@ -324,13 +340,25 @@ export function LivePanel() {
                 {entry?.status === "error" && (
                   <span className="flex items-center gap-1 text-xs text-destructive truncate">
                     <TriangleAlert className="w-3 h-3 flex-shrink-0" />
-                    {entry.error}
+                    <span className="truncate">{entry.error}</span>
                   </span>
                 )}
                 {!entry && (
                   <span className="text-xs text-muted-foreground">Queued</span>
                 )}
               </div>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {entry?.status === "error" && (
+                  <button
+                    type="button"
+                    aria-label={`Retry ${sym}`}
+                    title="Retry"
+                    className="text-muted-foreground hover:text-primary"
+                    onClick={() => void refreshOne(sym)}
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                )}
               <button
                 type="button"
                 aria-label={`Remove ${sym}`}
@@ -339,6 +367,7 @@ export function LivePanel() {
               >
                 <X className="w-4 h-4" />
               </button>
+              </div>
             </div>
           );
         })}

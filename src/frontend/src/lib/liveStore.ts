@@ -46,7 +46,7 @@ export interface BacktestState {
 }
 
 interface LiveState {
-  apiKey: string; // price key (for the selected price provider)
+  priceKeys: Record<PriceProvider, string>; // a separate key per price provider
   finnhubKey: string; // Finnhub (fundamentals + sentiment) — optional
   aiKey: string; // Anthropic (AI read) — optional
   priceProvider: PriceProvider;
@@ -54,7 +54,7 @@ interface LiveState {
   entries: Record<string, LiveEntry>;
   aiNotes: Record<string, AiNote>;
   backtest: BacktestState;
-  setApiKey: (key: string) => void;
+  setApiKey: (key: string) => void; // sets the key for the CURRENT provider
   setFinnhubKey: (key: string) => void;
   setAiKey: (key: string) => void;
   setPriceProvider: (p: PriceProvider) => void;
@@ -65,6 +65,7 @@ interface LiveState {
   removeSymbol: (symbol: string) => void;
   refreshOne: (symbol: string) => Promise<void>;
   refreshAll: () => Promise<void>;
+  retryErrored: () => Promise<void>;
   analyze: (play: Play) => Promise<void>;
   runBacktest: (opts: { horizon: number; symbols: string[] }) => Promise<void>;
 }
@@ -74,10 +75,15 @@ function priceProviderFor(p: PriceProvider) {
 }
 
 // Pacing between tickers during a batch scan, tuned to each free tier's
-// per-minute ceiling (Twelve Data: 8/min).
+// per-minute ceiling (Twelve Data: 8/min = 1 every 7.5s; we use 8s to be safe).
 function scanDelayMs(p: PriceProvider): number {
   return p === "twelveData" ? 8000 : 1500;
 }
+
+// Max tickers fetched before a longer inter-batch pause. Twelve Data's free tier
+// allows 8/min, so after 5 back-to-back requests (each ~8s apart) we've already
+// spent ~40s and used 5 of 8 slots — staying well within the limit.
+const BATCH_SIZE = 5;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const memoryStorage = {
@@ -89,7 +95,7 @@ const memoryStorage = {
 export const useLiveStore = create<LiveState>()(
   persist(
     (set, get) => ({
-      apiKey: "",
+      priceKeys: { alphaVantage: "", twelveData: "" },
       finnhubKey: "",
       aiKey: "",
       priceProvider: "alphaVantage",
@@ -103,7 +109,10 @@ export const useLiveStore = create<LiveState>()(
         succeeded: 0,
       },
 
-      setApiKey: (key) => set({ apiKey: key.trim() }),
+      setApiKey: (key) =>
+        set((s) => ({
+          priceKeys: { ...s.priceKeys, [s.priceProvider]: key.trim() },
+        })),
       setFinnhubKey: (key) => set({ finnhubKey: key.trim() }),
       setAiKey: (key) => set({ aiKey: key.trim() }),
       setPriceProvider: (p) => set({ priceProvider: p }),
@@ -202,7 +211,8 @@ export const useLiveStore = create<LiveState>()(
         }),
 
       refreshOne: async (symbol) => {
-        const { apiKey, priceProvider } = get();
+        const { priceProvider } = get();
+        const apiKey = get().priceKeys[priceProvider];
         const provider = priceProviderFor(priceProvider);
         if (!apiKey) {
           set((s) => ({
@@ -286,16 +296,39 @@ export const useLiveStore = create<LiveState>()(
 
       refreshAll: async () => {
         // Sequential, paced to the price provider's per-minute limit.
+        // Fetches at most BATCH_SIZE tickers before a longer pause so we never
+        // exceed the free-tier rate limit (Twelve Data: 8/min).
         const delay = scanDelayMs(get().priceProvider);
         const symbols = get().symbols;
         for (let i = 0; i < symbols.length; i++) {
           await get().refreshOne(symbols[i]);
-          if (i < symbols.length - 1) await sleep(delay);
+          if (i < symbols.length - 1) {
+            // After every BATCH_SIZE tickers, pause for a full minute window
+            // before continuing (conservative guard against burst limits).
+            const isEndOfBatch =
+              (i + 1) % BATCH_SIZE === 0 && i + 1 < symbols.length;
+            await sleep(isEndOfBatch ? 60_000 : delay);
+          }
+        }
+      },
+
+      retryErrored: async () => {
+        const { entries, symbols } = get();
+        const errored = symbols.filter((s) => entries[s]?.status === "error");
+        const delay = scanDelayMs(get().priceProvider);
+        for (let i = 0; i < errored.length; i++) {
+          await get().refreshOne(errored[i]);
+          if (i < errored.length - 1) {
+            const isEndOfBatch =
+              (i + 1) % BATCH_SIZE === 0 && i + 1 < errored.length;
+            await sleep(isEndOfBatch ? 60_000 : delay);
+          }
         }
       },
 
       runBacktest: async ({ horizon, symbols }) => {
-        const { apiKey, priceProvider } = get();
+        const { priceProvider } = get();
+        const apiKey = get().priceKeys[priceProvider];
         const provider = priceProviderFor(priceProvider);
         if (!apiKey) {
           set({

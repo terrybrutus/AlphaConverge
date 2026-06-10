@@ -34,7 +34,7 @@ export function TickerDetailPage() {
 
   const liveEntry = useLiveStore((s) => s.entries[sym]);
   const isLiveSymbol = useLiveStore((s) => s.symbols.includes(sym));
-  const apiKey = useLiveStore((s) => s.apiKey);
+  const apiKey = useLiveStore((s) => s.priceKeys[s.priceProvider]);
   const refreshOne = useLiveStore((s) => s.refreshOne);
 
   // If we arrived directly at a live ticker that hasn't been fetched (e.g. page

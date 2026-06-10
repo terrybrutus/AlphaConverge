@@ -90,7 +90,7 @@ function Verdict({ result }: { result: BtResult }) {
 }
 
 export function BacktestPage() {
-  const apiKey = useLiveStore((s) => s.apiKey);
+  const apiKey = useLiveStore((s) => s.priceKeys[s.priceProvider]);
   const watchlist = useLiveStore((s) => s.symbols);
   const backtest = useLiveStore((s) => s.backtest);
   const runBacktest = useLiveStore((s) => s.runBacktest);
