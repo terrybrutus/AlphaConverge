@@ -1,12 +1,11 @@
 import Map "mo:core/Map";
 import List "mo:core/List";
-import Types "types/stock";
-import StockApiMixin "mixins/stock-api";
+import Types "types/ticker";
+import TickerApiMixin "mixins/ticker-api";
 
 actor {
-  let stocks : Map.Map<Text, Types.Stock>;
-  let holdings : List.List<Types.PortfolioHolding>;
+  let tickers : Map.Map<Text, Types.Ticker>;
+  let watchlist : List.List<Text>;
 
-  include StockApiMixin(stocks, holdings);
+  include TickerApiMixin(tickers, watchlist);
 };
-

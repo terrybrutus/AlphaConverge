@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { Moon, Sun, TrendingUp } from "lucide-react";
+import { Link, useRouterState } from "@tanstack/react-router";
+import { Layers, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { ReactNode } from "react";
 
@@ -30,10 +30,10 @@ export function Layout({ children }: LayoutProps) {
             data-ocid="layout.logo_link"
           >
             <div className="w-8 h-8 rounded-lg bg-primary/20 border border-primary/40 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4 text-primary" />
+              <Layers className="w-4 h-4 text-primary" />
             </div>
             <span className="font-display text-xl font-bold text-foreground tracking-tight">
-              Stock<span className="text-primary">Hub</span>
+              Alpha<span className="text-primary">Converge</span>
             </span>
           </Link>
 
@@ -41,13 +41,13 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex items-center gap-2 md:gap-4">
             {!isMobile && (
               <nav className="flex items-center gap-1">
-                <Link to="/" data-ocid="layout.nav_dashboard">
+                <Link to="/" data-ocid="layout.nav_screener">
                   <Button
                     variant={isActive("/") ? "secondary" : "ghost"}
                     size="sm"
                     className="text-sm font-medium"
                   >
-                    Dashboard
+                    Screener
                   </Button>
                 </Link>
               </nav>
@@ -77,7 +77,10 @@ export function Layout({ children }: LayoutProps) {
       {/* Footer */}
       <footer className="bg-card border-t border-border">
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>© {new Date().getFullYear()} StockHub — Mock Data Only</span>
+          <span>
+            © {new Date().getFullYear()} AlphaConverge — Preview build, not
+            investment advice
+          </span>
           <a
             href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
             target="_blank"

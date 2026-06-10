@@ -1,6 +1,6 @@
 import { Layout } from "@/components/Layout";
-import { DashboardPage } from "@/pages/DashboardPage";
-import { StockDetailPage } from "@/pages/StockDetailPage";
+import { ScreenerPage } from "@/pages/ScreenerPage";
+import { TickerDetailPage } from "@/pages/TickerDetailPage";
 import {
   Outlet,
   RouterProvider,
@@ -21,16 +21,16 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  component: DashboardPage,
+  component: ScreenerPage,
 });
 
-const stockRoute = createRoute({
+const tickerRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/stock/$symbol",
-  component: StockDetailPage,
+  path: "/ticker/$symbol",
+  component: TickerDetailPage,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, stockRoute]);
+const routeTree = rootRoute.addChildren([indexRoute, tickerRoute]);
 
 const router = createRouter({ routeTree });
 
