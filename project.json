@@ -1,0 +1,18 @@
+{
+  "overview": "A skeleton stock tracking dashboard with mock data, price charts, and a portfolio view.",
+  "features": [
+    "Stock dashboard with mock data and sparklines",
+    "Interactive price history charts",
+    "Portfolio summary and holdings",
+    "Search and filter stocks",
+    "Responsive dark-mode design"
+  ],
+  "category": "productivity",
+  "tags": [
+    "finance",
+    "dashboard",
+    "charts",
+    "mock-data"
+  ],
+  "last_updated": "2026-06-10T03:33:42.654Z"
+}
