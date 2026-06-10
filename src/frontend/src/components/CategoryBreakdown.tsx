@@ -57,42 +57,60 @@ export function CategoryBreakdown({ category }: { category: CategoryResult }) {
       </div>
 
       <ul className="space-y-2.5">
-        {category.signals.map((s) => (
-          <li key={s.name} className="flex items-start gap-2.5">
-            <span
-              className={`mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full ${
-                s.fired
-                  ? "bg-primary/20 text-primary"
-                  : "bg-muted text-muted-foreground"
-              }`}
+        {category.signals.map((s) => {
+          const noData = s.available === false;
+          return (
+            <li
+              key={s.name}
+              className={`flex items-start gap-2.5 ${noData ? "opacity-60" : ""}`}
             >
-              {s.fired ? (
-                <Check className="h-3 w-3" />
-              ) : (
-                <Minus className="h-3 w-3" />
-              )}
-            </span>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span
-                  className={`text-sm font-medium ${
-                    s.fired ? "text-foreground" : "text-muted-foreground"
-                  }`}
-                >
-                  {s.name}
-                </span>
-                {s.value && (
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {s.value}
-                  </span>
+              <span
+                className={`mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full ${
+                  noData
+                    ? "bg-muted text-muted-foreground"
+                    : s.fired
+                      ? "bg-primary/20 text-primary"
+                      : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {noData ? (
+                  <PlugZap className="h-3 w-3" />
+                ) : s.fired ? (
+                  <Check className="h-3 w-3" />
+                ) : (
+                  <Minus className="h-3 w-3" />
                 )}
+              </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-sm font-medium ${
+                      s.fired && !noData
+                        ? "text-foreground"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {s.name}
+                  </span>
+                  {noData ? (
+                    <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                      no data
+                    </span>
+                  ) : (
+                    s.value && (
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {s.value}
+                      </span>
+                    )
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground leading-snug mt-0.5">
+                  {s.detail}
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground leading-snug mt-0.5">
-                {s.detail}
-              </p>
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

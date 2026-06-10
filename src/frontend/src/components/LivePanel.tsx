@@ -15,15 +15,19 @@ import { type FormEvent, useState } from "react";
 
 export function LivePanel() {
   const apiKey = useLiveStore((s) => s.apiKey);
+  const finnhubKey = useLiveStore((s) => s.finnhubKey);
   const symbols = useLiveStore((s) => s.symbols);
   const entries = useLiveStore((s) => s.entries);
   const setApiKey = useLiveStore((s) => s.setApiKey);
+  const setFinnhubKey = useLiveStore((s) => s.setFinnhubKey);
   const addSymbol = useLiveStore((s) => s.addSymbol);
   const removeSymbol = useLiveStore((s) => s.removeSymbol);
   const refreshAll = useLiveStore((s) => s.refreshAll);
 
   const [keyDraft, setKeyDraft] = useState("");
   const [editingKey, setEditingKey] = useState(false);
+  const [finnhubDraft, setFinnhubDraft] = useState("");
+  const [editingFinnhub, setEditingFinnhub] = useState(false);
   const [symbolDraft, setSymbolDraft] = useState("");
 
   const hasKey = apiKey.length > 0;
@@ -33,6 +37,13 @@ export function LivePanel() {
     setApiKey(keyDraft);
     setKeyDraft("");
     setEditingKey(false);
+  };
+
+  const submitFinnhub = (e: FormEvent) => {
+    e.preventDefault();
+    setFinnhubKey(finnhubDraft);
+    setFinnhubDraft("");
+    setEditingFinnhub(false);
   };
 
   const submitSymbol = (e: FormEvent) => {
@@ -55,9 +66,11 @@ export function LivePanel() {
         </h2>
       </div>
       <p className="text-sm text-muted-foreground mb-4">
-        Add any US ticker to score it on <strong>real</strong> price data. The
-        Technical category is computed live; the other categories show as “no
-        source” until their data providers are wired (see DATA.md).
+        Add any US ticker to score it on <strong>real</strong> data. Technical
+        is computed live from price; add a Finnhub key to also source
+        Fundamentals (insider buys, analyst trend, revenue accel). Remaining
+        categories show as “no source” until their providers are wired
+        (DATA.md).
       </p>
 
       {/* API key */}
@@ -94,12 +107,66 @@ export function LivePanel() {
       ) : (
         <div className="flex items-center justify-between mb-4 text-sm">
           <span className="text-muted-foreground">
-            <KeyRound className="w-3.5 h-3.5 inline mr-1" /> Key saved
+            <KeyRound className="w-3.5 h-3.5 inline mr-1" /> Price key saved
           </span>
           <button
             type="button"
             className="text-xs text-primary hover:underline"
             onClick={() => setEditingKey(true)}
+          >
+            Change
+          </button>
+        </div>
+      )}
+
+      {/* Optional Finnhub key — unlocks the Fundamental category */}
+      {finnhubKey.length === 0 || editingFinnhub ? (
+        <form onSubmit={submitFinnhub} className="mb-4">
+          <label
+            htmlFor="fh-key"
+            className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-1.5"
+          >
+            <KeyRound className="w-3.5 h-3.5" /> Finnhub API key{" "}
+            <span className="text-muted-foreground/70">
+              (optional — adds Fundamentals)
+            </span>
+          </label>
+          <div className="flex gap-2">
+            <Input
+              id="fh-key"
+              type="password"
+              value={finnhubDraft}
+              onChange={(e) => setFinnhubDraft(e.target.value)}
+              placeholder="Paste your free Finnhub key"
+              className="bg-muted/50"
+            />
+            <Button
+              type="submit"
+              variant="outline"
+              disabled={!finnhubDraft.trim()}
+            >
+              Save
+            </Button>
+          </div>
+          <a
+            href="https://finnhub.io/register"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-primary hover:underline mt-1.5 inline-block"
+          >
+            Get a free Finnhub key →
+          </a>
+        </form>
+      ) : (
+        <div className="flex items-center justify-between mb-4 text-sm">
+          <span className="text-muted-foreground">
+            <KeyRound className="w-3.5 h-3.5 inline mr-1" /> Fundamentals key
+            saved
+          </span>
+          <button
+            type="button"
+            className="text-xs text-primary hover:underline"
+            onClick={() => setEditingFinnhub(true)}
           >
             Change
           </button>
