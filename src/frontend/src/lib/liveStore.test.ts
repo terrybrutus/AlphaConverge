@@ -25,6 +25,9 @@ describe("user session isolation", () => {
     const cleared = useLiveStore.getState();
     expect(cleared.priceKeys).toEqual({ alphaVantage: "", twelveData: "" });
     expect(cleared.finnhubKey).toBe("");
+    expect(cleared.fmpKey).toBe("");
+    expect(cleared.simfinKey).toBe("");
+    expect(cleared.tiingoKey).toBe("");
     expect(cleared.aiKey).toBe("");
     expect(cleared.symbols).toEqual([]);
   });

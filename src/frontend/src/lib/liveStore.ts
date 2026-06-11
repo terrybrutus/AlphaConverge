@@ -11,12 +11,21 @@ import { buildLiveTicker } from "@/lib/liveTicker";
 import { type MacroFacts, fetchMacro } from "@/lib/macro";
 import { alphaVantageProvider } from "@/lib/providers/alphaVantage";
 import {
+  fetchAlphaVantageFundamentals,
+  fetchAlphaVantageSentiment,
+} from "@/lib/providers/alphaVantageEnrichment";
+import {
   type FundamentalData,
   type SentimentData,
   fetchFundamentals,
   fetchProfile,
   fetchSentiment,
 } from "@/lib/providers/finnhub";
+import { fetchFmpFundamentals } from "@/lib/providers/fmp";
+import {
+  mergeFundamentals,
+  mergeSentiment,
+} from "@/lib/providers/fundamentals";
 import { twelveDataProvider } from "@/lib/providers/twelveData";
 import {
   type ManualEvidence,
@@ -71,6 +80,9 @@ export interface BacktestState {
 interface LiveState {
   priceKeys: Record<PriceProvider, string>; // a separate key per price provider
   finnhubKey: string; // Finnhub (fundamentals + sentiment) — optional
+  fmpKey: string;
+  simfinKey: string;
+  tiingoKey: string;
   aiKey: string; // Anthropic (AI read) — optional
   priceProvider: PriceProvider;
   symbols: string[];
@@ -84,6 +96,9 @@ interface LiveState {
   setApiKey: (key: string) => void; // sets the key for the CURRENT provider
   setPriceKey: (provider: PriceProvider, key: string) => void;
   setFinnhubKey: (key: string) => void;
+  setFmpKey: (key: string) => void;
+  setSimfinKey: (key: string) => void;
+  setTiingoKey: (key: string) => void;
   setAiKey: (key: string) => void;
   setPriceProvider: (p: PriceProvider) => void;
   clearUserSession: () => void;
@@ -132,6 +147,9 @@ export const useLiveStore = create<LiveState>()(
     (set, get) => ({
       priceKeys: { alphaVantage: "", twelveData: "" },
       finnhubKey: "",
+      fmpKey: "",
+      simfinKey: "",
+      tiingoKey: "",
       aiKey: "",
       priceProvider: "alphaVantage",
       symbols: [],
@@ -157,12 +175,18 @@ export const useLiveStore = create<LiveState>()(
           priceKeys: { ...s.priceKeys, [provider]: key.trim() },
         })),
       setFinnhubKey: (key) => set({ finnhubKey: key.trim() }),
+      setFmpKey: (key) => set({ fmpKey: key.trim() }),
+      setSimfinKey: (key) => set({ simfinKey: key.trim() }),
+      setTiingoKey: (key) => set({ tiingoKey: key.trim() }),
       setAiKey: (key) => set({ aiKey: key.trim() }),
       setPriceProvider: (p) => set({ priceProvider: p }),
       clearUserSession: () =>
         set({
           priceKeys: { alphaVantage: "", twelveData: "" },
           finnhubKey: "",
+          fmpKey: "",
+          simfinKey: "",
+          tiingoKey: "",
           aiKey: "",
           symbols: [],
           entries: {},
@@ -360,7 +384,7 @@ export const useLiveStore = create<LiveState>()(
           let fundamentals: FundamentalData | undefined;
           let sentiment: SentimentData | undefined;
           let source = provider.name;
-          const { finnhubKey } = get();
+          const { finnhubKey, fmpKey } = get();
           if (finnhubKey) {
             try {
               const profile = await fetchProfile(symbol, finnhubKey);
@@ -381,6 +405,40 @@ export const useLiveStore = create<LiveState>()(
             }
             if (fundamentals || sentiment) {
               source = `${provider.name} + Finnhub`;
+            }
+          }
+
+          if (fmpKey) {
+            try {
+              fundamentals = mergeFundamentals(
+                fundamentals,
+                await fetchFmpFundamentals(symbol, fmpKey),
+              );
+              source = `${source} + FMP`;
+            } catch {
+              // Plan-gated or unavailable FMP fields remain unknown.
+            }
+          }
+
+          // A free Alpha Vantage account is too constrained for enrichment
+          // across a broad queue. Use these extra calls only for one ticker.
+          if (priceProvider === "alphaVantage" && get().scanQueue.total <= 1) {
+            try {
+              fundamentals = mergeFundamentals(
+                fundamentals,
+                await fetchAlphaVantageFundamentals(symbol, apiKey),
+              );
+              source = `${source} + Alpha Vantage fundamentals`;
+            } catch {
+              // Leave unknown on quota/plan errors.
+            }
+            try {
+              sentiment = mergeSentiment(
+                sentiment,
+                await fetchAlphaVantageSentiment(symbol, apiKey),
+              );
+            } catch {
+              // Leave unknown on quota/plan errors.
             }
           }
 

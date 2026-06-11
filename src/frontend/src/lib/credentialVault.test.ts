@@ -12,6 +12,9 @@ describe("credential vault", () => {
       twelveData: "twelve-secret",
     },
     finnhubKey: "fundamental-secret",
+    fmpKey: "fmp-secret",
+    simfinKey: "simfin-secret",
+    tiingoKey: "tiingo-secret",
     aiKey: "ai-secret",
   };
 

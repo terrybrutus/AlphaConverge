@@ -12,7 +12,7 @@ const PROVIDERS: Record<
   alphaVantage: {
     label: "Alpha Vantage",
     signup: "https://www.alphavantage.co/support/#api-key",
-    note: "About 25 requests/day on the free tier.",
+    note: "About 25 requests/day on the free tier. Single-ticker scans also attempt statements and news enrichment; broad scans skip those extra calls.",
   },
   twelveData: {
     label: "Twelve Data",
@@ -84,10 +84,16 @@ export function SettingsPage() {
   const priceKeys = useLiveStore((state) => state.priceKeys);
   const entries = useLiveStore((state) => state.entries);
   const finnhubKey = useLiveStore((state) => state.finnhubKey);
+  const fmpKey = useLiveStore((state) => state.fmpKey);
+  const simfinKey = useLiveStore((state) => state.simfinKey);
+  const tiingoKey = useLiveStore((state) => state.tiingoKey);
   const aiKey = useLiveStore((state) => state.aiKey);
   const setPriceProvider = useLiveStore((state) => state.setPriceProvider);
   const setPriceKey = useLiveStore((state) => state.setPriceKey);
   const setFinnhubKey = useLiveStore((state) => state.setFinnhubKey);
+  const setFmpKey = useLiveStore((state) => state.setFmpKey);
+  const setSimfinKey = useLiveStore((state) => state.setSimfinKey);
+  const setTiingoKey = useLiveStore((state) => state.setTiingoKey);
   const setAiKey = useLiveStore((state) => state.setAiKey);
 
   const savePriceKey = (provider: PriceProvider, value: string) => {
@@ -150,14 +156,35 @@ export function SettingsPage() {
             active={!!finnhubKey}
             onSave={setFinnhubKey}
             signup="https://finnhub.io/register"
-            note="Currently adds insider transactions, company profile, and headline sentiment."
+            note="Adds insider transactions, company profile, and recent headline sentiment. Unsupported Finnhub fields remain unknown."
+          />
+          <KeyForm
+            label="Financial Modeling Prep fundamentals key"
+            active={!!fmpKey}
+            onSave={setFmpKey}
+            signup="https://site.financialmodelingprep.com/developer/docs/pricing"
+            note="Adds quarterly revenue acceleration and historical valuation when your FMP plan permits those endpoints. Free Basic is limited to 250 calls/day and may reject fundamental endpoints."
+          />
+          <KeyForm
+            label="SimFin fundamentals key"
+            active={!!simfinKey}
+            onSave={setSimfinKey}
+            signup="https://simfin.com/"
+            note="Stored in the encrypted vault for future bulk-fundamentals ingestion. Not called during browser scans because SimFin is better suited to dataset workflows."
+          />
+          <KeyForm
+            label="Tiingo data key"
+            active={!!tiingoKey}
+            onSave={setTiingoKey}
+            signup="https://www.tiingo.com/"
+            note="Stored for future price/news fallback support. It currently does not fill a missing independent evidence family."
           />
           <KeyForm
             label="Anthropic AI-read key"
             active={!!aiKey}
             onSave={setAiKey}
             signup="https://console.anthropic.com/"
-            note="Optional and used only when you click AI read."
+            note="Optional and used only when you click AI read. It explains sourced signals; it does not currently search the web or change scores."
           />
         </div>
 

@@ -4,6 +4,9 @@ export interface CredentialPayload {
   priceProvider: PriceProvider;
   priceKeys: Record<PriceProvider, string>;
   finnhubKey: string;
+  fmpKey: string;
+  simfinKey: string;
+  tiingoKey: string;
   aiKey: string;
 }
 
@@ -46,6 +49,9 @@ function isCredentialPayload(value: unknown): value is CredentialPayload {
     typeof (payload.priceKeys as Record<string, unknown>).twelveData ===
       "string" &&
     typeof payload.finnhubKey === "string" &&
+    typeof payload.fmpKey === "string" &&
+    typeof payload.simfinKey === "string" &&
+    typeof payload.tiingoKey === "string" &&
     typeof payload.aiKey === "string"
   );
 }
@@ -123,6 +129,19 @@ export async function decryptCredentialVault(
     if (
       payload &&
       typeof payload === "object" &&
+      "priceKeys" in payload &&
+      "finnhubKey" in payload &&
+      "aiKey" in payload
+    ) {
+      const prior = payload as Omit<
+        CredentialPayload,
+        "fmpKey" | "simfinKey" | "tiingoKey"
+      >;
+      return { ...prior, fmpKey: "", simfinKey: "", tiingoKey: "" };
+    }
+    if (
+      payload &&
+      typeof payload === "object" &&
       (payload.priceProvider === "alphaVantage" ||
         payload.priceProvider === "twelveData") &&
       typeof payload.apiKey === "string" &&
@@ -138,6 +157,9 @@ export async function decryptCredentialVault(
             payload.priceProvider === "twelveData" ? payload.apiKey : "",
         },
         finnhubKey: payload.finnhubKey,
+        fmpKey: "",
+        simfinKey: "",
+        tiingoKey: "",
         aiKey: payload.aiKey,
       };
     }

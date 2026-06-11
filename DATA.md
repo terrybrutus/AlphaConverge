@@ -62,6 +62,34 @@ that browser's local storage.
 
 These features remain browser-side and do not consume ICP canister cycles.
 
+## Provider enrichment and free-tier reality
+
+Provider facts are merged signal-by-signal. One provider returning no data
+cannot erase a signal sourced by another provider.
+
+- **Finnhub** supplies company profile, insider transactions, and recent
+  headline sentiment. The app does not reinterpret unrelated Finnhub metrics as
+  revenue acceleration or estimate revisions.
+- **FMP** is queried for quarterly revenue acceleration and historical P/E
+  comparison. Its free Basic plan allows 250 calls/day, but fundamental
+  endpoints may be plan-gated. Rejected endpoints remain unknown.
+- **Alpha Vantage free** is queried for quarterly revenue acceleration and news
+  sentiment only during a single-ticker Alpha Vantage scan. Its roughly
+  25-request/day free limit makes enrichment across a broad list impractical.
+- **SimFin** and **Tiingo** keys can be stored in the encrypted vault, but they
+  are not called during browser scans yet. SimFin is better suited to a bulk
+  fundamentals ingestion workflow; Tiingo currently duplicates price/news
+  coverage rather than filling a missing independent family.
+- **Anthropic AI Read** explains the facts already sourced by the engine. It
+  does not search the web or change scores. Anthropic web search can later be
+  added as an optional cited research assistant, but should not be allowed to
+  turn narrative search results directly into scored financial facts.
+
+The encrypted vault can be overwritten at any time by saving again with the
+keys active in the current session. Its passphrase remains unrecoverable. An
+optional hint is stored only in the current browser and should never contain
+the passphrase itself.
+
 True whole-market nightly scanning (all ~8,000 US equities) is still a
 big-ticket item. Prefer an external worker plus paid data; do not add a canister
 timer or canister HTTP-outcall loop without an explicit cycle budget.
