@@ -5,6 +5,7 @@ import { MethodologyPage } from "@/pages/MethodologyPage";
 import { ScreenerPage } from "@/pages/ScreenerPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { TickerDetailPage } from "@/pages/TickerDetailPage";
+import { ValidationPage } from "@/pages/ValidationPage";
 import {
   Outlet,
   RouterProvider,
@@ -58,6 +59,12 @@ const examplesRoute = createRoute({
   component: ExamplesPage,
 });
 
+const validationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/validation",
+  component: ValidationPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   tickerRoute,
@@ -65,6 +72,7 @@ const routeTree = rootRoute.addChildren([
   backtestRoute,
   settingsRoute,
   examplesRoute,
+  validationRoute,
 ]);
 
 const router = createRouter({ routeTree });

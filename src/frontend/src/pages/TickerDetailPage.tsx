@@ -1,6 +1,7 @@
 import { AiRead } from "@/components/AiRead";
 import { CategoryBreakdown } from "@/components/CategoryBreakdown";
 import { ConvergenceMeter } from "@/components/ConvergenceMeter";
+import { ResearchPanel } from "@/components/ResearchPanel";
 import { StageBadge } from "@/components/StageBadge";
 import { Button } from "@/components/ui/button";
 import { SAMPLE_UNIVERSE } from "@/data/sampleUniverse";
@@ -175,6 +176,7 @@ export function TickerDetailPage() {
 
         {/* AI read */}
         <AiRead play={play} />
+        {!play.sample && <ResearchPanel play={play} />}
 
         {/* Price history */}
         <motion.div

@@ -1,8 +1,9 @@
 import { PlayCard } from "@/components/PlayCard";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { STARTER_UNIVERSE } from "@/data/starterUniverse";
 import { useLiveStore } from "@/lib/liveStore";
+import { parseTickerImport } from "@/lib/research";
 import type { Play } from "@/types/ticker";
 import { Link } from "@tanstack/react-router";
 import {
@@ -67,11 +68,7 @@ export function LivePanel() {
 
   const submitSymbol = (e: FormEvent) => {
     e.preventDefault();
-    const incoming = symbolDraft
-      .toUpperCase()
-      .split(/[\s,;]+/)
-      .map((symbol) => symbol.trim())
-      .filter(Boolean);
+    const incoming = parseTickerImport(symbolDraft);
     if (incoming.length === 0) return;
     if (incoming.length === 1) addSymbol(incoming[0]);
     else void loadSymbols(incoming);
@@ -114,12 +111,12 @@ export function LivePanel() {
       </div>
 
       {/* Add symbol */}
-      <form onSubmit={submitSymbol} className="flex gap-2 mb-4">
-        <Input
+      <form onSubmit={submitSymbol} className="flex items-start gap-2 mb-4">
+        <Textarea
           value={symbolDraft}
-          onChange={(e) => setSymbolDraft(e.target.value.toUpperCase())}
-          placeholder="Add or paste tickers (PLTR, SOFI, HOOD)"
-          className="bg-muted/50"
+          onChange={(e) => setSymbolDraft(e.target.value)}
+          placeholder="Paste tickers or an exported Finviz table"
+          className="min-h-20 bg-muted/50"
           disabled={!hasKey}
         />
         <Button type="submit" disabled={!hasKey || !symbolDraft.trim()}>

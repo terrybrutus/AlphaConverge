@@ -19,6 +19,32 @@ The result views split names into **Surfaced** (strict independent confirmation)
 **Candidates** (technical structure aligned but not independently confirmed),
 and **On watch**.
 
+Finviz's paid export is not required for manual discovery. Paste a full table
+captured by a browser table exporter into the Screener; AlphaConverge detects
+the `Ticker` column and scans only those symbols.
+
+## Low-cost full-model validation
+
+Open any live ticker and use **Cheap research validation** to record sourced
+manual facts from SEC filings, FINRA, Finviz, an options screen, or another
+research source. Each judgment requires a source and date, stays labeled as
+manual research, and can be marked confirmed or contradicted. It then
+participates in the same strict coverage and scoring rules as provider data.
+
+This makes a manually researched 4/4 possible without paying for a broad
+real-time feed. It does not make the process automatic, and a manual judgment
+is only as reliable as its source.
+
+Click **Track this setup** before the outcome is known. The **Validation** page
+keeps a browser-local forward record of its score, evidence-family count,
+coverage, manual-fact count, entry price, and latest refreshed price. This is
+the inexpensive honest test of whether 3/4 and 4/4 setups outperform weaker
+setups. Refresh tracked tickers periodically to update their outcomes.
+
+No recurring canister timer, canister HTTP outcall, or cycle-consuming scan is
+used for this workflow. Evidence and validation records currently remain in
+that browser's local storage.
+
 True whole-market nightly scanning (all ~8,000 US equities) is still a
 big-ticket item. Prefer an external worker plus paid data; do not add a canister
 timer or canister HTTP-outcall loop without an explicit cycle budget.

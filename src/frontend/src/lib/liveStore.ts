@@ -18,13 +18,20 @@ import {
   fetchSentiment,
 } from "@/lib/providers/finnhub";
 import { twelveDataProvider } from "@/lib/providers/twelveData";
-import type { Play } from "@/types/ticker";
+import {
+  type ManualEvidence,
+  type ManualSignalEvidence,
+  type ValidationRecord,
+  applyManualEvidence,
+} from "@/lib/research";
+import type { Play, TickerRaw } from "@/types/ticker";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 export interface LiveEntry {
   status: "loading" | "ok" | "error";
   play?: Play;
+  raw?: TickerRaw;
   error?: string;
   updatedAt?: number;
 }
@@ -55,6 +62,8 @@ interface LiveState {
   entries: Record<string, LiveEntry>;
   aiNotes: Record<string, AiNote>;
   backtest: BacktestState;
+  manualEvidence: Record<string, ManualEvidence>;
+  validationRecords: ValidationRecord[];
   setApiKey: (key: string) => void; // sets the key for the CURRENT provider
   setPriceKey: (provider: PriceProvider, key: string) => void;
   setFinnhubKey: (key: string) => void;
@@ -68,6 +77,12 @@ interface LiveState {
   refreshOne: (symbol: string) => Promise<void>;
   refreshAll: () => Promise<void>;
   retryErrored: () => Promise<void>;
+  setManualEvidence: (
+    symbol: string,
+    signal: string,
+    evidence?: ManualSignalEvidence,
+  ) => void;
+  trackPlay: (play: Play) => void;
   analyze: (play: Play) => Promise<void>;
   runBacktest: (opts: { horizon: number; symbols: string[] }) => Promise<void>;
 }
@@ -106,6 +121,8 @@ export const useLiveStore = create<LiveState>()(
         failures: [],
         succeeded: 0,
       },
+      manualEvidence: {},
+      validationRecords: [],
 
       setApiKey: (key) =>
         set((s) => ({
@@ -132,6 +149,8 @@ export const useLiveStore = create<LiveState>()(
             failures: [],
             succeeded: 0,
           },
+          manualEvidence: {},
+          validationRecords: [],
         }),
 
       analyze: async (play) => {
@@ -290,12 +309,28 @@ export const useLiveStore = create<LiveState>()(
             sentiment,
             macro,
           });
-          const play = scoreTicker(ticker);
+          const play = scoreTicker(
+            applyManualEvidence(ticker, get().manualEvidence[symbol]),
+          );
           set((s) => ({
             entries: {
               ...s.entries,
-              [symbol]: { status: "ok", play, updatedAt: Date.now() },
+              [symbol]: {
+                status: "ok",
+                raw: ticker,
+                play,
+                updatedAt: Date.now(),
+              },
             },
+            validationRecords: s.validationRecords.map((record) =>
+              record.symbol === symbol
+                ? {
+                    ...record,
+                    latestPrice: play.price,
+                    latestAt: Date.now(),
+                  }
+                : record,
+            ),
           }));
         } catch (e) {
           set((s) => ({
@@ -327,6 +362,63 @@ export const useLiveStore = create<LiveState>()(
           if (i < errored.length - 1) await sleep(delay);
         }
       },
+
+      setManualEvidence: (symbol, signal, evidence) =>
+        set((s) => {
+          const current = s.manualEvidence[symbol] ?? { signals: {} };
+          const signals = { ...current.signals };
+          if (evidence) signals[signal] = evidence;
+          else delete signals[signal];
+          const manualEvidence = {
+            ...s.manualEvidence,
+            [symbol]: { signals },
+          };
+          const entry = s.entries[symbol];
+          if (!entry?.raw) return { manualEvidence };
+          const researched = applyManualEvidence(
+            entry.raw,
+            manualEvidence[symbol],
+          );
+          return {
+            manualEvidence,
+            entries: {
+              ...s.entries,
+              [symbol]: { ...entry, play: scoreTicker(researched) },
+            },
+          };
+        }),
+
+      trackPlay: (play) =>
+        set((s) => {
+          const now = Date.now();
+          const alreadyTrackedToday = s.validationRecords.some(
+            (record) =>
+              record.symbol === play.symbol &&
+              new Date(record.capturedAt).toDateString() ===
+                new Date(now).toDateString(),
+          );
+          if (alreadyTrackedToday) return {};
+          return {
+            validationRecords: [
+              ...s.validationRecords,
+              {
+                id: `${play.symbol}-${now}`,
+                symbol: play.symbol,
+                capturedAt: now,
+                entryPrice: play.price,
+                convergenceScore: play.convergenceScore,
+                categoriesAligned: play.categoriesAligned,
+                surfaced: play.surfaced,
+                dataCoverage: play.dataCoverage,
+                manualSignalCount: Object.keys(
+                  s.manualEvidence[play.symbol]?.signals ?? {},
+                ).length,
+                latestPrice: play.price,
+                latestAt: now,
+              },
+            ],
+          };
+        }),
 
       runBacktest: async ({ horizon, symbols }) => {
         const { priceProvider } = get();
@@ -418,7 +510,7 @@ export const useLiveStore = create<LiveState>()(
     }),
     {
       name: "alphaconverge-live",
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() =>
         typeof localStorage === "undefined" ? memoryStorage : localStorage,
       ),
@@ -428,6 +520,8 @@ export const useLiveStore = create<LiveState>()(
           priceProvider: prior.priceProvider ?? "alphaVantage",
           symbols: prior.symbols ?? [],
           entries: prior.entries ?? {},
+          manualEvidence: prior.manualEvidence ?? {},
+          validationRecords: prior.validationRecords ?? [],
         } as LiveState;
       },
       partialize: (s) => ({
@@ -438,6 +532,8 @@ export const useLiveStore = create<LiveState>()(
             ([, entry]) => entry.status === "ok",
           ),
         ),
+        manualEvidence: s.manualEvidence,
+        validationRecords: s.validationRecords,
       }),
     },
   ),

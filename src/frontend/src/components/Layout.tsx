@@ -60,6 +60,15 @@ export function Layout({ children }: LayoutProps) {
                     Backtest
                   </Button>
                 </Link>
+                <Link to="/validation">
+                  <Button
+                    variant={isActive("/validation") ? "secondary" : "ghost"}
+                    size="sm"
+                    className="text-sm font-medium"
+                  >
+                    Validation
+                  </Button>
+                </Link>
                 <Link to="/how-it-works" data-ocid="layout.nav_methodology">
                   <Button
                     variant={isActive("/how-it-works") ? "secondary" : "ghost"}
