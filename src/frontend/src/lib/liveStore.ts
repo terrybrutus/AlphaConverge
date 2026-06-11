@@ -35,7 +35,7 @@ import {
   type ValidationRecord,
   applyManualEvidence,
 } from "@/lib/research";
-import type { Play, TickerRaw } from "@/types/ticker";
+import type { Play, ProviderAudit, TickerRaw } from "@/types/ticker";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -45,6 +45,7 @@ export interface LiveEntry {
   raw?: TickerRaw;
   error?: string;
   updatedAt?: number;
+  providerAudits?: ProviderAudit[];
 }
 
 export interface PlaySnapshot {
@@ -377,7 +378,14 @@ export const useLiveStore = create<LiveState>()(
           },
         }));
         try {
+          const providerAudits: ProviderAudit[] = [];
           const candles = await provider.weeklyCandles(symbol, apiKey);
+          providerAudits.push({
+            provider: provider.name,
+            area: "weekly price and volume",
+            status: "success",
+            detail: `${candles.length} weekly candles returned; Technical was computed locally.`,
+          });
 
           // Everything beyond price is best-effort: a failure here must not sink
           // the technical analysis, which is the core of the live ticker.
@@ -393,34 +401,118 @@ export const useLiveStore = create<LiveState>()(
               const profile = await fetchProfile(symbol, finnhubKey);
               name = profile.name;
               sector = profile.sector;
-            } catch {
-              // leave undefined
+              providerAudits.push({
+                provider: "Finnhub",
+                area: "profile",
+                status: profile.name || profile.sector ? "success" : "partial",
+                detail:
+                  profile.name || profile.sector
+                    ? "Company identity and sector metadata returned."
+                    : "Request succeeded but returned no usable profile metadata.",
+              });
+            } catch (error) {
+              providerAudits.push({
+                provider: "Finnhub",
+                area: "profile",
+                status: "error",
+                detail: (error as Error).message,
+              });
             }
             try {
               fundamentals = await fetchFundamentals(symbol, finnhubKey);
-            } catch {
+              const count = Object.values(fundamentals.availability).filter(
+                Boolean,
+              ).length;
+              providerAudits.push({
+                provider: "Finnhub",
+                area: "fundamentals",
+                status: count > 0 ? "partial" : "error",
+                detail:
+                  count > 0
+                    ? `${count} of 6 Fundamental signals became measurable.`
+                    : "Request returned no measurable Fundamental signals.",
+              });
+            } catch (error) {
               fundamentals = undefined;
+              providerAudits.push({
+                provider: "Finnhub",
+                area: "fundamentals",
+                status: "error",
+                detail: (error as Error).message,
+              });
             }
             try {
               sentiment = await fetchSentiment(symbol, finnhubKey);
-            } catch {
+              const count = Object.values(sentiment.availability).filter(
+                Boolean,
+              ).length;
+              providerAudits.push({
+                provider: "Finnhub",
+                area: "news and sentiment",
+                status:
+                  count >= 2 ? "success" : count > 0 ? "partial" : "error",
+                detail:
+                  count > 0
+                    ? `${count} of 3 Sentiment signals became measurable.`
+                    : "No recent company news was returned, so Sentiment remained unmeasurable.",
+              });
+            } catch (error) {
               sentiment = undefined;
+              providerAudits.push({
+                provider: "Finnhub",
+                area: "news and sentiment",
+                status: "error",
+                detail: (error as Error).message,
+              });
             }
             if (fundamentals || sentiment) {
               source = `${provider.name} + Finnhub`;
             }
+          } else {
+            providerAudits.push({
+              provider: "Finnhub",
+              area: "fundamentals and sentiment",
+              status: "not-configured",
+              detail:
+                "No Finnhub key was active, so insider activity and company-news evidence were not requested.",
+            });
           }
 
           if (fmpKey) {
             try {
               const fmp = await fetchFmpFundamentals(symbol, fmpKey);
               fundamentals = mergeFundamentals(fundamentals, fmp);
-              if (Object.values(fmp.availability).some(Boolean)) {
+              const count = Object.values(fmp.availability).filter(
+                Boolean,
+              ).length;
+              if (count > 0) {
                 source = `${source} + FMP`;
               }
-            } catch {
-              // Plan-gated or unavailable FMP fields remain unknown.
+              providerAudits.push({
+                provider: "FMP",
+                area: "fundamentals",
+                status: count > 0 ? "partial" : "error",
+                detail:
+                  count > 0
+                    ? `${count} of 6 Fundamental signals became measurable.`
+                    : "No usable revenue acceleration or historical valuation data returned; endpoints may be plan-gated.",
+              });
+            } catch (error) {
+              providerAudits.push({
+                provider: "FMP",
+                area: "fundamentals",
+                status: "error",
+                detail: (error as Error).message,
+              });
             }
+          } else {
+            providerAudits.push({
+              provider: "FMP",
+              area: "fundamentals",
+              status: "not-configured",
+              detail:
+                "No FMP key was active, so revenue acceleration and historical P/E were not requested.",
+            });
           }
 
           // A free Alpha Vantage account is too constrained for enrichment
@@ -435,16 +527,51 @@ export const useLiveStore = create<LiveState>()(
               if (Object.values(alphaFundamentals.availability).some(Boolean)) {
                 source = `${source} + Alpha Vantage fundamentals`;
               }
-            } catch {
-              // Leave unknown on quota/plan errors.
+              providerAudits.push({
+                provider: "Alpha Vantage",
+                area: "fundamental enrichment",
+                status: Object.values(alphaFundamentals.availability).some(
+                  Boolean,
+                )
+                  ? "partial"
+                  : "error",
+                detail: Object.values(alphaFundamentals.availability).some(
+                  Boolean,
+                )
+                  ? "Quarterly statements returned and revenue acceleration became measurable."
+                  : "Request succeeded but returned no usable revenue acceleration.",
+              });
+            } catch (error) {
+              providerAudits.push({
+                provider: "Alpha Vantage",
+                area: "fundamental enrichment",
+                status: "error",
+                detail: (error as Error).message,
+              });
             }
             try {
-              sentiment = mergeSentiment(
-                sentiment,
-                await fetchAlphaVantageSentiment(symbol, apiKey),
+              const alphaSentiment = await fetchAlphaVantageSentiment(
+                symbol,
+                apiKey,
               );
-            } catch {
-              // Leave unknown on quota/plan errors.
+              sentiment = mergeSentiment(sentiment, alphaSentiment);
+              providerAudits.push({
+                provider: "Alpha Vantage",
+                area: "sentiment enrichment",
+                status: Object.values(alphaSentiment.availability).some(Boolean)
+                  ? "partial"
+                  : "error",
+                detail: Object.values(alphaSentiment.availability).some(Boolean)
+                  ? "Ticker-specific news sentiment became measurable."
+                  : "Request succeeded but returned no ticker-specific sentiment.",
+              });
+            } catch (error) {
+              providerAudits.push({
+                provider: "Alpha Vantage",
+                area: "sentiment enrichment",
+                status: "error",
+                detail: (error as Error).message,
+              });
             }
             try {
               microstructure = await fetchAlphaVantageMicrostructure(
@@ -454,9 +581,34 @@ export const useLiveStore = create<LiveState>()(
               if (Object.values(microstructure.availability).some(Boolean)) {
                 source = `${source} + Alpha Vantage options`;
               }
-            } catch {
-              // Options are often plan-gated; leave unknown.
+              providerAudits.push({
+                provider: "Alpha Vantage",
+                area: "options microstructure",
+                status: Object.values(microstructure.availability).some(Boolean)
+                  ? "partial"
+                  : "error",
+                detail: Object.values(microstructure.availability).some(Boolean)
+                  ? "Options chain returned; unusual calls and put/call positioning were measured."
+                  : "Options request returned no measurable microstructure fields.",
+              });
+            } catch (error) {
+              providerAudits.push({
+                provider: "Alpha Vantage",
+                area: "options microstructure",
+                status: "error",
+                detail: (error as Error).message,
+              });
             }
+          } else {
+            providerAudits.push({
+              provider: "Alpha Vantage",
+              area: "fundamental, sentiment, and options enrichment",
+              status: "skipped",
+              detail:
+                priceProvider !== "alphaVantage"
+                  ? "Skipped because Alpha Vantage is not the selected price provider."
+                  : "Skipped during a batch scan to protect the free account's small daily quota. Scan one ticker to attempt it.",
+            });
           }
 
           // Macro/sector uses the price provider (SPY + sector ETF trends,
@@ -464,8 +616,26 @@ export const useLiveStore = create<LiveState>()(
           let macro: MacroFacts | undefined;
           try {
             macro = await fetchMacro(provider, apiKey, sector);
-          } catch {
+            const count = Object.values(macro.availability).filter(
+              Boolean,
+            ).length;
+            providerAudits.push({
+              provider: provider.name,
+              area: "macro context",
+              status: count > 0 ? "partial" : "error",
+              detail:
+                count > 0
+                  ? `${count} Macro context signals became measurable; Macro remains context and cannot inflate convergence.`
+                  : "No usable benchmark or sector context returned.",
+            });
+          } catch (error) {
             macro = undefined;
+            providerAudits.push({
+              provider: provider.name,
+              area: "macro context",
+              status: "error",
+              detail: (error as Error).message,
+            });
           }
 
           const ticker = buildLiveTicker(symbol, candles, {
@@ -488,6 +658,7 @@ export const useLiveStore = create<LiveState>()(
                 raw: ticker,
                 play,
                 updatedAt: Date.now(),
+                providerAudits,
               },
             },
             validationRecords: s.validationRecords.map((record) =>

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { STARTER_UNIVERSE } from "@/data/starterUniverse";
 import { scoreTicker } from "@/lib/convergence";
+import { maximumObservableScore, surfacedBlocker } from "@/lib/evidenceAudit";
 import { useLiveStore } from "@/lib/liveStore";
 import { analyzeTickerImport } from "@/lib/research";
 import { evidenceIsFresh } from "@/lib/research";
@@ -544,6 +545,11 @@ export function LivePanel() {
                 </p>
                 <p className="mt-1 rounded-md border border-border bg-muted/30 px-2 py-1 text-xs text-muted-foreground">
                   Next research: {missingWork(play)}
+                </p>
+                <p className="mt-1 rounded-md border border-border bg-muted/30 px-2 py-1 text-xs text-muted-foreground">
+                  Acquisition audit: score {play.convergenceScore} /{" "}
+                  {maximumObservableScore(play)} currently observable.{" "}
+                  {surfacedBlocker(play)}
                 </p>
               </div>
             );

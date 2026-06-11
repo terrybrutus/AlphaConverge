@@ -126,3 +126,17 @@ export interface Play {
   categoriesWithData: number; // how many of the 5 categories have a live source
   dataCoverage: number; // weighted coverage across independent evidence, 0..100
 }
+
+export type ProviderAuditStatus =
+  | "success"
+  | "partial"
+  | "error"
+  | "skipped"
+  | "not-configured";
+
+export interface ProviderAudit {
+  provider: string;
+  area: string;
+  status: ProviderAuditStatus;
+  detail: string;
+}

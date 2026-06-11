@@ -19,6 +19,13 @@ The result views split names into **Surfaced** (strict independent confirmation)
 **Candidates** (technical structure aligned but not independently confirmed),
 and **On watch**.
 
+Every live ticker detail now includes an **Evidence acquisition audit**. It
+separates sourced-negative evidence from evidence the app could not observe,
+shows the maximum score that the completed scan could possibly have produced
+from its returned coverage, and records provider requests that succeeded,
+failed, were plan-gated, or were deliberately skipped to protect a free quota.
+This diagnostic layer does not award points or loosen alignment thresholds.
+
 Finviz's paid export is not required for manual discovery. Paste a full table
 captured by a browser table exporter into the Screener; AlphaConverge detects
 the `Ticker` column and scans only those symbols.

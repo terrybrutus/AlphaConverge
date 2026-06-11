@@ -1,6 +1,7 @@
 import { AiRead } from "@/components/AiRead";
 import { CategoryBreakdown } from "@/components/CategoryBreakdown";
 import { ConvergenceMeter } from "@/components/ConvergenceMeter";
+import { EvidenceAuditPanel } from "@/components/EvidenceAuditPanel";
 import { ResearchPanel } from "@/components/ResearchPanel";
 import { StageBadge } from "@/components/StageBadge";
 import { Button } from "@/components/ui/button";
@@ -177,6 +178,12 @@ export function TickerDetailPage() {
         {/* AI read */}
         <AiRead play={play} />
         {!play.sample && <ResearchPanel play={play} />}
+        {!play.sample && (
+          <EvidenceAuditPanel
+            play={play}
+            providerAudits={liveEntry?.providerAudits ?? []}
+          />
+        )}
 
         {/* Price history */}
         <motion.div
