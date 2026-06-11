@@ -23,9 +23,23 @@ describe("user session isolation", () => {
     useLiveStore.getState().clearUserSession();
 
     const cleared = useLiveStore.getState();
-    expect(cleared.apiKey).toBe("");
+    expect(cleared.priceKeys).toEqual({ alphaVantage: "", twelveData: "" });
     expect(cleared.finnhubKey).toBe("");
     expect(cleared.aiKey).toBe("");
     expect(cleared.symbols).toEqual([]);
+  });
+
+  it("keeps separate price-provider keys without switching providers", () => {
+    const store = useLiveStore.getState();
+    store.setPriceProvider("alphaVantage");
+    store.setPriceKey("alphaVantage", "alpha-secret");
+    store.setPriceKey("twelveData", "twelve-secret");
+
+    const updated = useLiveStore.getState();
+    expect(updated.priceProvider).toBe("alphaVantage");
+    expect(updated.priceKeys).toEqual({
+      alphaVantage: "alpha-secret",
+      twelveData: "twelve-secret",
+    });
   });
 });

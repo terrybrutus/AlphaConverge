@@ -7,7 +7,10 @@ import { describe, expect, it } from "vitest";
 describe("credential vault", () => {
   const payload = {
     priceProvider: "twelveData" as const,
-    apiKey: "price-secret",
+    priceKeys: {
+      alphaVantage: "alpha-secret",
+      twelveData: "twelve-secret",
+    },
     finnhubKey: "fundamental-secret",
     aiKey: "ai-secret",
   };
@@ -17,7 +20,7 @@ describe("credential vault", () => {
       payload,
       "a sufficiently long passphrase",
     );
-    expect(encrypted).not.toContain("price-secret");
+    expect(encrypted).not.toContain("alpha-secret");
     await expect(
       decryptCredentialVault(encrypted, "a sufficiently long passphrase"),
     ).resolves.toEqual(payload);

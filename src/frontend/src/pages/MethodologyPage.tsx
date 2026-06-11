@@ -225,15 +225,34 @@ export function MethodologyPage() {
 
         {/* Honesty */}
         <div className="mt-10">
+          <SectionTitle>What live data can confirm today</SectionTitle>
+          <div className="rounded-xl border border-accent/30 bg-accent/10 p-5 text-sm leading-relaxed text-accent/90">
+            <p>
+              Live Technical is fully connected. Finnhub currently supplies
+              insider buying (18% of Fundamental) and headline sentiment (35% of
+              Sentiment). Independent Microstructure has no connected live
+              source. Because a family needs at least 50% coverage to align, the
+              current free-source wiring cannot produce a strict Surfaced play.
+            </p>
+            <p className="mt-2">
+              The Screener therefore labels technically aligned names as
+              Candidates for further research without pretending they have
+              independent confirmation. Illustrated complete setups live on the
+              Examples page and remain clearly marked Preview.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-10">
           <SectionTitle>On the numbers you see</SectionTitle>
           <div className="bg-card border border-border rounded-xl p-5 flex items-start gap-3">
             <Gauge className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
             <p className="text-sm text-muted-foreground leading-relaxed">
-              This build runs on a labeled preview universe so you can see the
-              engine work end to end. Nothing here is live market data — every
-              preview ticker is badged as such. The scoring logic is real; only
-              the inputs are placeholders until live data providers are
-              connected. This is a research tool, not investment advice.
+              The Screener uses live provider data for connected fields. The
+              separate Examples page uses a labeled fictional universe so you
+              can see the complete engine work end to end. Missing live fields
+              remain unknown and never become positive evidence. This is a
+              research tool, not investment advice.
             </p>
           </div>
         </div>

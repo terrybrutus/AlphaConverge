@@ -3,12 +3,21 @@ import { StageBadge } from "@/components/StageBadge";
 import { INSTRUMENT_LABEL } from "@/lib/convergence";
 import type { Play } from "@/types/ticker";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, FlaskConical, Radio, Target } from "lucide-react";
+import {
+  AlertTriangle,
+  CircleDot,
+  FlaskConical,
+  Radio,
+  Target,
+} from "lucide-react";
 import { Line, LineChart, ResponsiveContainer } from "recharts";
 
 export function PlayCard({ play, rank }: { play: Play; rank: number }) {
   const chartData = play.priceHistory.map((p, i) => ({ i, p }));
   const instrumentLabel = INSTRUMENT_LABEL[play.instrument];
+  const technicalAligned =
+    play.categories.find((category) => category.key === "technical")?.aligned ??
+    false;
 
   return (
     <Link
@@ -35,14 +44,19 @@ export function PlayCard({ play, rank }: { play: Play; rank: number }) {
                   <Radio className="w-3 h-3" /> Live
                 </span>
               )}
+              {!play.sample && !play.surfaced && technicalAligned && (
+                <span className="inline-flex items-center gap-1 rounded-md border border-chart-4/40 bg-chart-4/10 px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wide text-chart-4">
+                  <CircleDot className="w-3 h-3" /> Candidate, not confirmed
+                </span>
+              )}
             </div>
             <p className="text-sm text-muted-foreground truncate">
               {play.name} · {play.sector}
             </p>
             {!play.sample && (
               <p className="text-[11px] text-muted-foreground/80 mt-0.5">
-                {play.dataCoverage}% weighted data coverage
-                {play.source ? ` · ${play.source}` : ""}
+                {play.dataCoverage}% of the independent evidence model sourced
+                {play.source ? ` · Providers: ${play.source}` : ""}
               </p>
             )}
             <p className="mt-1 font-mono text-lg font-semibold text-foreground">

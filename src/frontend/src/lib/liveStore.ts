@@ -26,6 +26,7 @@ export interface LiveEntry {
   status: "loading" | "ok" | "error";
   play?: Play;
   error?: string;
+  updatedAt?: number;
 }
 
 export interface AiNote {
@@ -55,6 +56,7 @@ interface LiveState {
   aiNotes: Record<string, AiNote>;
   backtest: BacktestState;
   setApiKey: (key: string) => void; // sets the key for the CURRENT provider
+  setPriceKey: (provider: PriceProvider, key: string) => void;
   setFinnhubKey: (key: string) => void;
   setAiKey: (key: string) => void;
   setPriceProvider: (p: PriceProvider) => void;
@@ -77,13 +79,9 @@ function priceProviderFor(p: PriceProvider) {
 // Pacing between tickers during a batch scan, tuned to each free tier's
 // per-minute ceiling (Twelve Data: 8/min = 1 every 7.5s; we use 8s to be safe).
 function scanDelayMs(p: PriceProvider): number {
-  return p === "twelveData" ? 8000 : 1500;
+  // Twelve Data has a provider-level queue that also covers benchmark calls.
+  return p === "twelveData" ? 0 : 1500;
 }
-
-// Max tickers fetched before a longer inter-batch pause. Twelve Data's free tier
-// allows 8/min, so after 5 back-to-back requests (each ~8s apart) we've already
-// spent ~40s and used 5 of 8 slots — staying well within the limit.
-const BATCH_SIZE = 5;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const memoryStorage = {
@@ -113,12 +111,16 @@ export const useLiveStore = create<LiveState>()(
         set((s) => ({
           priceKeys: { ...s.priceKeys, [s.priceProvider]: key.trim() },
         })),
+      setPriceKey: (provider, key) =>
+        set((s) => ({
+          priceKeys: { ...s.priceKeys, [provider]: key.trim() },
+        })),
       setFinnhubKey: (key) => set({ finnhubKey: key.trim() }),
       setAiKey: (key) => set({ aiKey: key.trim() }),
       setPriceProvider: (p) => set({ priceProvider: p }),
       clearUserSession: () =>
         set({
-          apiKey: "",
+          priceKeys: { alphaVantage: "", twelveData: "" },
           finnhubKey: "",
           aiKey: "",
           symbols: [],
@@ -179,14 +181,22 @@ export const useLiveStore = create<LiveState>()(
       // Add many symbols (e.g. the starter universe) without firing a fetch per
       // symbol, then scan them sequentially with pacing.
       loadSymbols: async (raw) => {
-        const incoming = raw.map((s) => s.trim().toUpperCase()).filter(Boolean);
+        const existing = get().symbols;
+        const entries = get().entries;
+        const incoming = Array.from(
+          new Set(raw.map((s) => s.trim().toUpperCase()).filter(Boolean)),
+        ).filter((symbol) => !existing.includes(symbol) || !entries[symbol]);
         set((s) => {
           const merged = [...s.symbols];
           for (const sym of incoming)
             if (!merged.includes(sym)) merged.push(sym);
           return { symbols: merged };
         });
-        await get().refreshAll();
+        const delay = scanDelayMs(get().priceProvider);
+        for (let i = 0; i < incoming.length; i++) {
+          await get().refreshOne(incoming[i]);
+          if (i < incoming.length - 1) await sleep(delay);
+        }
       },
 
       replaceSymbols: (raw) =>
@@ -282,7 +292,10 @@ export const useLiveStore = create<LiveState>()(
           });
           const play = scoreTicker(ticker);
           set((s) => ({
-            entries: { ...s.entries, [symbol]: { status: "ok", play } },
+            entries: {
+              ...s.entries,
+              [symbol]: { status: "ok", play, updatedAt: Date.now() },
+            },
           }));
         } catch (e) {
           set((s) => ({
@@ -295,20 +308,13 @@ export const useLiveStore = create<LiveState>()(
       },
 
       refreshAll: async () => {
-        // Sequential, paced to the price provider's per-minute limit.
-        // Fetches at most BATCH_SIZE tickers before a longer pause so we never
-        // exceed the free-tier rate limit (Twelve Data: 8/min).
+        // Sequential and paced to the selected provider's free-tier limit.
+        // The UI groups progress naturally, but requests never run concurrently.
         const delay = scanDelayMs(get().priceProvider);
         const symbols = get().symbols;
         for (let i = 0; i < symbols.length; i++) {
           await get().refreshOne(symbols[i]);
-          if (i < symbols.length - 1) {
-            // After every BATCH_SIZE tickers, pause for a full minute window
-            // before continuing (conservative guard against burst limits).
-            const isEndOfBatch =
-              (i + 1) % BATCH_SIZE === 0 && i + 1 < symbols.length;
-            await sleep(isEndOfBatch ? 60_000 : delay);
-          }
+          if (i < symbols.length - 1) await sleep(delay);
         }
       },
 
@@ -318,11 +324,7 @@ export const useLiveStore = create<LiveState>()(
         const delay = scanDelayMs(get().priceProvider);
         for (let i = 0; i < errored.length; i++) {
           await get().refreshOne(errored[i]);
-          if (i < errored.length - 1) {
-            const isEndOfBatch =
-              (i + 1) % BATCH_SIZE === 0 && i + 1 < errored.length;
-            await sleep(isEndOfBatch ? 60_000 : delay);
-          }
+          if (i < errored.length - 1) await sleep(delay);
         }
       },
 
@@ -416,7 +418,7 @@ export const useLiveStore = create<LiveState>()(
     }),
     {
       name: "alphaconverge-live",
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() =>
         typeof localStorage === "undefined" ? memoryStorage : localStorage,
       ),
@@ -425,11 +427,17 @@ export const useLiveStore = create<LiveState>()(
         return {
           priceProvider: prior.priceProvider ?? "alphaVantage",
           symbols: prior.symbols ?? [],
+          entries: prior.entries ?? {},
         } as LiveState;
       },
       partialize: (s) => ({
         priceProvider: s.priceProvider,
         symbols: s.symbols,
+        entries: Object.fromEntries(
+          Object.entries(s.entries).filter(
+            ([, entry]) => entry.status === "ok",
+          ),
+        ),
       }),
     },
   ),

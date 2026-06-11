@@ -39,10 +39,20 @@ data are available.
 
 ## Status
 
-This build ships with a **labeled sample universe** so the engine and UI are
-fully navigable. Nothing is presented as live market truth — preview data is
-badged everywhere. See **[`DATA.md`](./DATA.md)** for the plan to wire real
-sources (price, SEC EDGAR, Reddit, options flow) through ICP HTTP outcalls.
+The Screener analyzes live tickers with browser-side price and Finnhub data.
+Successful scan results are cached locally so an ordinary refresh does not
+start over. A separate **Examples** page contains a labeled fictional universe
+that demonstrates complete surfaced setups.
+
+Current free-source coverage can fully score Technical, but Fundamental and
+Sentiment are partial and independent Microstructure is not connected.
+Technically aligned live names are therefore labeled **Candidates**, never
+misrepresented as confirmed Surfaced plays. See **[`DATA.md`](./DATA.md)** for
+the live coverage and provider plan.
+
+API keys live in memory for the session. The **Settings** page optionally saves
+all provider keys in a browser-encrypted, Internet Identity-scoped vault; the
+canister receives ciphertext only.
 
 The convergence logic is real and lives in
 [`src/frontend/src/lib/convergence.ts`](./src/frontend/src/lib/convergence.ts).

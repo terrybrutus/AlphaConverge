@@ -1,20 +1,23 @@
 # AlphaConverge — Data Wiring Plan
 
-AlphaConverge ships today with a **labeled sample universe** so the convergence
-engine and UI are fully navigable. Nothing in the app is presented as live
-market truth until you connect real sources. This document is the checklist for
-that wiring.
+AlphaConverge's Screener analyzes live tickers from connected browser-side
+providers. A separate **Examples** page contains a labeled fictional universe
+so the complete convergence experience remains navigable without presenting
+sample inputs as market truth.
 
 ## Discovery — finding candidates without typing symbols
 
-The Screener auto-ranks whatever universe it scores. For the sample set that's
-automatic; for live data you either add symbols or hit **Load & scan starter
-set** in the Live panel — a curated ~24-name universe the engine scores and
-splits into **Surfaced** (price structure + two independent non-price company
-evidence families) vs **Scanned** (ranked, not yet a setup). Pick the **price
-source** in the panel: Alpha Vantage (~25/day — fine
-for a few names) or **Twelve Data** (~800/day, 8/min — enough to scan the set).
-Scans are paced to the provider's per-minute limit.
+Add one symbol, paste a comma/space-separated list exported from another
+screener, or click **Load & scan starter set**. Configure Alpha Vantage,
+Twelve Data, Finnhub, and Anthropic keys on **Settings**. Scans are sequential
+and paced to the selected provider's per-minute limit. Twelve Data uses one
+browser-side queue for ticker, SPY, and sector-ETF calls so benchmark requests
+cannot accidentally exceed the limit. Successful live results are cached in
+browser storage; provider keys are not.
+
+The result views split names into **Surfaced** (strict independent confirmation),
+**Candidates** (technical structure aligned but not independently confirmed),
+and **On watch**.
 
 True whole-market nightly scanning (all ~8,000 US equities) is still a
 big-ticket item. Prefer an external worker plus paid data; do not add a canister
@@ -41,16 +44,20 @@ timer or canister HTTP-outcall loop without an explicit cycle budget.
   canister HTTP outcall). Prefer an external ingestion worker before adding
   recurring canister outcalls.
 - **Honest by construction.** A live ticker only has data for the Technical
-  category; the other four are shown as **“no source connected”** and cannot
-  count toward convergence, so a live ticker won’t surface on technicals alone.
-  Sample tickers remain badged **Preview**.
+  category plus the partial sources listed below. Unsupported signals show
+  **"no data"** and cannot count toward convergence. With the current wiring,
+  Fundamental can reach only 18% coverage, Sentiment only 35%, and
+  Microstructure 0%; each needs 50% to align. Strict live Surfaced plays are
+  therefore not reachable yet. Technically aligned names are labeled
+  Candidates instead. Sample tickers remain badged **Preview** on Examples.
 - **Architecture decision.** Public market data is fetched **browser-side**
   (per the project’s original design), not via canister HTTP outcalls — this
   avoids the ICP consensus problem for non-deterministic API responses and
   needs no cycles. The canister is reserved for explicit, authenticated
   watchlist persistence and encrypted credential-vault ciphertext.
-  Files: `lib/providers/` (provider interface + Alpha Vantage), `lib/liveTicker.ts`
-  (candles → scorable ticker), `lib/liveStore.ts` (key + symbols + fetch state).
+  Files: `lib/providers/` (provider interfaces), `lib/liveTicker.ts`
+  (candles → scorable ticker), `lib/liveStore.ts` (symbols, cached results, and
+  session-only keys).
 
 - **Sentiment category is partially real** (same Finnhub key). Via
   `lib/providers/finnhub.ts` it sources **news-headline sentiment** (a transparent
@@ -146,8 +153,10 @@ an API — implement them in the backend refresh or a shared TS util:
 - When a data source is unavailable, mark the affected fields as unknown rather
   than guessing — an unknown signal scores as "not fired", it is never faked.
 
-## Known follow-up in the current scaffold
+## Known follow-up
 
-- The frontend preview pages still read `SAMPLE_UNIVERSE`; switch them to a
-  trusted shared-market-data source only after its writer, refresh cadence, and
-  cycle budget are deliberately configured.
+- Add point-in-time Fundamental and Sentiment history before claiming a
+  full-model historical backtest. The current backtest deliberately validates
+  only price-derived structure.
+- Connect at least two sufficiently covered non-price company evidence families
+  before strict live Surfaced plays can become reachable.

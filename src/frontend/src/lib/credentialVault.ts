@@ -2,7 +2,7 @@ import type { PriceProvider } from "@/lib/liveStore";
 
 export interface CredentialPayload {
   priceProvider: PriceProvider;
-  apiKey: string;
+  priceKeys: Record<PriceProvider, string>;
   finnhubKey: string;
   aiKey: string;
 }
@@ -39,7 +39,12 @@ function isCredentialPayload(value: unknown): value is CredentialPayload {
   return (
     (payload.priceProvider === "alphaVantage" ||
       payload.priceProvider === "twelveData") &&
-    typeof payload.apiKey === "string" &&
+    !!payload.priceKeys &&
+    typeof payload.priceKeys === "object" &&
+    typeof (payload.priceKeys as Record<string, unknown>).alphaVantage ===
+      "string" &&
+    typeof (payload.priceKeys as Record<string, unknown>).twelveData ===
+      "string" &&
     typeof payload.finnhubKey === "string" &&
     typeof payload.aiKey === "string"
   );
@@ -106,9 +111,37 @@ export async function decryptCredentialVault(
       key,
       asArrayBuffer(fromBase64(vault.ciphertext)),
     );
-    const payload = JSON.parse(decoder.decode(plaintext)) as unknown;
-    if (!isCredentialPayload(payload)) throw new Error("Invalid vault payload.");
-    return payload;
+    const payload = JSON.parse(decoder.decode(plaintext)) as
+      | CredentialPayload
+      | {
+          priceProvider: PriceProvider;
+          apiKey: string;
+          finnhubKey: string;
+          aiKey: string;
+        };
+    if (isCredentialPayload(payload)) return payload;
+    if (
+      payload &&
+      typeof payload === "object" &&
+      (payload.priceProvider === "alphaVantage" ||
+        payload.priceProvider === "twelveData") &&
+      typeof payload.apiKey === "string" &&
+      typeof payload.finnhubKey === "string" &&
+      typeof payload.aiKey === "string"
+    ) {
+      return {
+        priceProvider: payload.priceProvider,
+        priceKeys: {
+          alphaVantage:
+            payload.priceProvider === "alphaVantage" ? payload.apiKey : "",
+          twelveData:
+            payload.priceProvider === "twelveData" ? payload.apiKey : "",
+        },
+        finnhubKey: payload.finnhubKey,
+        aiKey: payload.aiKey,
+      };
+    }
+    throw new Error("Invalid vault payload.");
   } catch {
     throw new Error("Could not unlock vault. Check the passphrase.");
   }
