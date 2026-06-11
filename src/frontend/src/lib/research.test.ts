@@ -1,6 +1,11 @@
 import { MICRO_SIGNAL } from "@/lib/convergence";
 import { buildLiveTicker } from "@/lib/liveTicker";
-import { applyManualEvidence, parseTickerImport } from "@/lib/research";
+import {
+  analyzeTickerImport,
+  applyManualEvidence,
+  evidenceIsFresh,
+  parseTickerImport,
+} from "@/lib/research";
 import type { Candle } from "@/lib/technicals";
 import { describe, expect, it } from "vitest";
 
@@ -17,6 +22,28 @@ describe("research helpers", () => {
       "SOFI",
       "HOOD",
     ]);
+  });
+
+  it("previews duplicate and rejected import values", () => {
+    expect(analyzeTickerImport("PLTR, PLTR, INVALIDWORD")).toMatchObject({
+      symbols: ["PLTR"],
+      duplicates: ["PLTR"],
+      rejected: ["INVALIDWORD"],
+    });
+  });
+
+  it("expires time-sensitive manual evidence", () => {
+    expect(
+      evidenceIsFresh(
+        "Unusual call activity",
+        {
+          verdict: "confirmed",
+          source: "test",
+          observedAt: "2025-01-01",
+        },
+        new Date("2025-02-01").getTime(),
+      ),
+    ).toBe(false);
   });
 
   it("turns sourced manual evidence into available evidence", () => {

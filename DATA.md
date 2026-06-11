@@ -45,6 +45,23 @@ No recurring canister timer, canister HTTP outcall, or cycle-consuming scan is
 used for this workflow. Evidence and validation records currently remain in
 that browser's local storage.
 
+## Screener workflow and quotas
+
+- Imports always show a preview before scanning. The preview reports detected,
+  new, existing, duplicate, and rejected values.
+- Imported symbols can be added without scanning, scanned only when new, or
+  deliberately rescanned.
+- Ranked results remain above the collapsed scan-status list.
+- Batch scans can be paused and resumed between ticker requests.
+- Successful cards can be refreshed individually, selected for bulk refresh,
+  tracked in bulk, removed in bulk, or exported to CSV.
+- Each refresh keeps a short browser-local score snapshot history so the
+  Screener can sort by recent improvement and display score changes.
+- Manual research facts expire by signal type. Fast-moving options and
+  sentiment facts expire quickly; filing-based facts remain valid longer.
+
+These features remain browser-side and do not consume ICP canister cycles.
+
 True whole-market nightly scanning (all ~8,000 US equities) is still a
 big-ticket item. Prefer an external worker plus paid data; do not add a canister
 timer or canister HTTP-outcall loop without an explicit cycle budget.

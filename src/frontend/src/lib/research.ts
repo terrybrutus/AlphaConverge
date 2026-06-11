@@ -14,6 +14,13 @@ export interface ManualEvidence {
   signals: Record<string, ManualSignalEvidence>;
 }
 
+export interface ImportPreview {
+  symbols: string[];
+  duplicates: string[];
+  rejected: string[];
+  mode: "table" | "list";
+}
+
 export const RESEARCH_SIGNALS = [
   FUND_SIGNAL.revAccel,
   FUND_SIGNAL.estRev,
@@ -49,38 +56,82 @@ function validSymbol(value: string): boolean {
 }
 
 export function parseTickerImport(text: string): string[] {
+  return analyzeTickerImport(text).symbols;
+}
+
+export function analyzeTickerImport(text: string): ImportPreview {
   const lines = text
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
-  if (lines.length === 0) return [];
+  if (lines.length === 0)
+    return { symbols: [], duplicates: [], rejected: [], mode: "list" };
 
   const header = lines[0].split(/\t| {2,}/).map((cell) => cell.trim());
   const tickerIndex = header.findIndex(
     (cell) => cell.toUpperCase() === "TICKER",
   );
   if (tickerIndex >= 0) {
-    return Array.from(
-      new Set(
-        lines
-          .slice(1)
-          .map((line) => line.split(/\t| {2,}/)[tickerIndex]?.toUpperCase())
-          .filter(
-            (symbol): symbol is string => !!symbol && validSymbol(symbol),
-          ),
-      ),
-    );
+    const values = lines
+      .slice(1)
+      .map((line) => line.split(/\t| {2,}/)[tickerIndex]?.toUpperCase())
+      .filter((symbol): symbol is string => !!symbol);
+    return classifyImport(values, "table");
   }
 
-  return Array.from(
-    new Set(
-      text
-        .toUpperCase()
-        .split(/[\s,;]+/)
-        .map((token) => token.trim())
-        .filter(validSymbol),
-    ),
+  return classifyImport(
+    text
+      .toUpperCase()
+      .split(/[\s,;]+/)
+      .map((token) => token.trim())
+      .filter(Boolean),
+    "list",
   );
+}
+
+function classifyImport(
+  values: string[],
+  mode: ImportPreview["mode"],
+): ImportPreview {
+  const symbols: string[] = [];
+  const duplicates: string[] = [];
+  const rejected: string[] = [];
+  for (const value of values) {
+    if (!validSymbol(value)) {
+      rejected.push(value);
+    } else if (symbols.includes(value)) {
+      duplicates.push(value);
+    } else {
+      symbols.push(value);
+    }
+  }
+  return { symbols, duplicates, rejected, mode };
+}
+
+const FRESHNESS_DAYS: Record<string, number> = {
+  [MICRO_SIGNAL.unusualCall]: 7,
+  [MICRO_SIGNAL.darkPool]: 14,
+  [MICRO_SIGNAL.putCall]: 14,
+  [SENT_SIGNAL.reddit]: 7,
+  [SENT_SIGNAL.news]: 14,
+  [SENT_SIGNAL.trends]: 14,
+  [MICRO_SIGNAL.shortFuel]: 30,
+  [FUND_SIGNAL.estRev]: 45,
+  [FUND_SIGNAL.insider]: 120,
+  [FUND_SIGNAL.inst]: 120,
+};
+
+export function evidenceFreshnessDays(signal: string): number {
+  return FRESHNESS_DAYS[signal] ?? 90;
+}
+
+export function evidenceIsFresh(
+  signal: string,
+  evidence: ManualSignalEvidence,
+  now = Date.now(),
+): boolean {
+  const observed = new Date(`${evidence.observedAt}T00:00:00`).getTime();
+  return now - observed <= evidenceFreshnessDays(signal) * 86_400_000;
 }
 
 function setSignalValue(ticker: TickerRaw, name: string, fired: boolean) {
@@ -139,11 +190,14 @@ export function applyManualEvidence(
   };
 
   for (const [name, fact] of Object.entries(evidence.signals)) {
+    if (!evidenceIsFresh(name, fact)) continue;
     ticker.signalAvailability![name] = true;
     setSignalValue(ticker, name, fact.verdict === "confirmed");
   }
 
-  const names = Object.keys(evidence.signals);
+  const names = Object.entries(evidence.signals)
+    .filter(([name, fact]) => evidenceIsFresh(name, fact))
+    .map(([name]) => name);
   ticker.availability!.fundamental =
     !!ticker.availability?.fundamental ||
     names.some((name) => Object.values(FUND_SIGNAL).includes(name as never));

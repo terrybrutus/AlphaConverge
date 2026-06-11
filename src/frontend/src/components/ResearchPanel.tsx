@@ -1,7 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLiveStore } from "@/lib/liveStore";
-import { RESEARCH_SIGNALS } from "@/lib/research";
+import {
+  RESEARCH_SIGNALS,
+  evidenceFreshnessDays,
+  evidenceIsFresh,
+} from "@/lib/research";
 import type { Play } from "@/types/ticker";
 import { BookOpenCheck, Check, Minus, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -48,6 +52,7 @@ export function ResearchPanel({ play }: { play: Play }) {
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
         {RESEARCH_SIGNALS.map((signal) => {
           const current = evidence?.signals[signal];
+          const stale = current ? !evidenceIsFresh(signal, current) : false;
           return (
             <div
               key={signal}
@@ -59,7 +64,7 @@ export function ResearchPanel({ play }: { play: Play }) {
                 </p>
                 <p className="truncate text-[10px] text-muted-foreground">
                   {current
-                    ? `${current.verdict} · ${current.source} · ${current.observedAt}`
+                    ? `${stale ? "expired" : current.verdict} · ${current.source} · ${current.observedAt} · ${evidenceFreshnessDays(signal)}d freshness`
                     : "Unreviewed"}
                 </p>
               </div>

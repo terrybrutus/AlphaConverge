@@ -36,6 +36,21 @@ export interface LiveEntry {
   updatedAt?: number;
 }
 
+export interface PlaySnapshot {
+  capturedAt: number;
+  score: number;
+  coverage: number;
+  aligned: number;
+  surfaced: boolean;
+}
+
+export interface ScanQueue {
+  status: "idle" | "running" | "paused";
+  pending: string[];
+  completed: number;
+  total: number;
+}
+
 export interface AiNote {
   status: "loading" | "ok" | "error";
   text?: string;
@@ -64,6 +79,8 @@ interface LiveState {
   backtest: BacktestState;
   manualEvidence: Record<string, ManualEvidence>;
   validationRecords: ValidationRecord[];
+  snapshots: Record<string, PlaySnapshot[]>;
+  scanQueue: ScanQueue;
   setApiKey: (key: string) => void; // sets the key for the CURRENT provider
   setPriceKey: (provider: PriceProvider, key: string) => void;
   setFinnhubKey: (key: string) => void;
@@ -72,8 +89,13 @@ interface LiveState {
   clearUserSession: () => void;
   addSymbol: (symbol: string) => void;
   loadSymbols: (symbols: string[]) => Promise<void>;
+  addWithoutScan: (symbols: string[]) => void;
+  scanSymbols: (symbols: string[]) => Promise<void>;
+  pauseScan: () => void;
+  resumeScan: () => Promise<void>;
   replaceSymbols: (symbols: string[]) => void;
   removeSymbol: (symbol: string) => void;
+  removeSymbols: (symbols: string[]) => void;
   refreshOne: (symbol: string) => Promise<void>;
   refreshAll: () => Promise<void>;
   retryErrored: () => Promise<void>;
@@ -123,6 +145,8 @@ export const useLiveStore = create<LiveState>()(
       },
       manualEvidence: {},
       validationRecords: [],
+      snapshots: {},
+      scanQueue: { status: "idle", pending: [], completed: 0, total: 0 },
 
       setApiKey: (key) =>
         set((s) => ({
@@ -151,6 +175,8 @@ export const useLiveStore = create<LiveState>()(
           },
           manualEvidence: {},
           validationRecords: [],
+          snapshots: {},
+          scanQueue: { status: "idle", pending: [], completed: 0, total: 0 },
         }),
 
       analyze: async (play) => {
@@ -211,11 +237,62 @@ export const useLiveStore = create<LiveState>()(
             if (!merged.includes(sym)) merged.push(sym);
           return { symbols: merged };
         });
+        await get().scanSymbols(incoming);
+      },
+
+      addWithoutScan: (raw) =>
+        set((s) => ({
+          symbols: Array.from(
+            new Set([
+              ...s.symbols,
+              ...raw
+                .map((symbol) => symbol.trim().toUpperCase())
+                .filter(Boolean),
+            ]),
+          ),
+        })),
+
+      scanSymbols: async (raw) => {
+        const queue = Array.from(
+          new Set(
+            raw.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean),
+          ),
+        );
+        get().addWithoutScan(queue);
+        set({
+          scanQueue: {
+            status: "running",
+            pending: queue,
+            completed: 0,
+            total: queue.length,
+          },
+        });
         const delay = scanDelayMs(get().priceProvider);
-        for (let i = 0; i < incoming.length; i++) {
-          await get().refreshOne(incoming[i]);
-          if (i < incoming.length - 1) await sleep(delay);
+        while (get().scanQueue.pending.length > 0) {
+          if (get().scanQueue.status === "paused") return;
+          const symbol = get().scanQueue.pending[0];
+          await get().refreshOne(symbol);
+          set((s) => ({
+            scanQueue: {
+              ...s.scanQueue,
+              pending: s.scanQueue.pending.slice(1),
+              completed: s.scanQueue.completed + 1,
+            },
+          }));
+          if (get().scanQueue.pending.length > 0) await sleep(delay);
         }
+        set((s) => ({ scanQueue: { ...s.scanQueue, status: "idle" } }));
+      },
+
+      pauseScan: () =>
+        set((s) => ({
+          scanQueue: { ...s.scanQueue, status: "paused" },
+        })),
+
+      resumeScan: async () => {
+        const pending = get().scanQueue.pending;
+        if (pending.length === 0) return;
+        await get().scanSymbols(pending);
       },
 
       replaceSymbols: (raw) =>
@@ -239,6 +316,17 @@ export const useLiveStore = create<LiveState>()(
           };
         }),
 
+      removeSymbols: (symbols) =>
+        set((s) => {
+          const remove = new Set(symbols);
+          const entries = { ...s.entries };
+          for (const symbol of remove) delete entries[symbol];
+          return {
+            symbols: s.symbols.filter((symbol) => !remove.has(symbol)),
+            entries,
+          };
+        }),
+
       refreshOne: async (symbol) => {
         const { priceProvider } = get();
         const apiKey = get().priceKeys[priceProvider];
@@ -248,6 +336,7 @@ export const useLiveStore = create<LiveState>()(
             entries: {
               ...s.entries,
               [symbol]: {
+                ...s.entries[symbol],
                 status: "error",
                 error: `Add your ${provider.name} API key first.`,
               },
@@ -256,7 +345,10 @@ export const useLiveStore = create<LiveState>()(
           return;
         }
         set((s) => ({
-          entries: { ...s.entries, [symbol]: { status: "loading" } },
+          entries: {
+            ...s.entries,
+            [symbol]: { ...s.entries[symbol], status: "loading" },
+          },
         }));
         try {
           const candles = await provider.weeklyCandles(symbol, apiKey);
@@ -331,12 +423,29 @@ export const useLiveStore = create<LiveState>()(
                   }
                 : record,
             ),
+            snapshots: {
+              ...s.snapshots,
+              [symbol]: [
+                ...(s.snapshots[symbol] ?? []),
+                {
+                  capturedAt: Date.now(),
+                  score: play.convergenceScore,
+                  coverage: play.dataCoverage,
+                  aligned: play.categoriesAligned,
+                  surfaced: play.surfaced,
+                },
+              ].slice(-20),
+            },
           }));
         } catch (e) {
           set((s) => ({
             entries: {
               ...s.entries,
-              [symbol]: { status: "error", error: (e as Error).message },
+              [symbol]: {
+                ...s.entries[symbol],
+                status: "error",
+                error: (e as Error).message,
+              },
             },
           }));
         }
@@ -345,22 +454,13 @@ export const useLiveStore = create<LiveState>()(
       refreshAll: async () => {
         // Sequential and paced to the selected provider's free-tier limit.
         // The UI groups progress naturally, but requests never run concurrently.
-        const delay = scanDelayMs(get().priceProvider);
-        const symbols = get().symbols;
-        for (let i = 0; i < symbols.length; i++) {
-          await get().refreshOne(symbols[i]);
-          if (i < symbols.length - 1) await sleep(delay);
-        }
+        await get().scanSymbols(get().symbols);
       },
 
       retryErrored: async () => {
         const { entries, symbols } = get();
         const errored = symbols.filter((s) => entries[s]?.status === "error");
-        const delay = scanDelayMs(get().priceProvider);
-        for (let i = 0; i < errored.length; i++) {
-          await get().refreshOne(errored[i]);
-          if (i < errored.length - 1) await sleep(delay);
-        }
+        await get().scanSymbols(errored);
       },
 
       setManualEvidence: (symbol, signal, evidence) =>
@@ -510,7 +610,7 @@ export const useLiveStore = create<LiveState>()(
     }),
     {
       name: "alphaconverge-live",
-      version: 4,
+      version: 5,
       storage: createJSONStorage(() =>
         typeof localStorage === "undefined" ? memoryStorage : localStorage,
       ),
@@ -522,7 +622,9 @@ export const useLiveStore = create<LiveState>()(
           entries: prior.entries ?? {},
           manualEvidence: prior.manualEvidence ?? {},
           validationRecords: prior.validationRecords ?? [],
-        } as LiveState;
+          snapshots: prior.snapshots ?? {},
+          scanQueue: { status: "idle", pending: [], completed: 0, total: 0 },
+        } as unknown as LiveState;
       },
       partialize: (s) => ({
         priceProvider: s.priceProvider,
@@ -534,6 +636,7 @@ export const useLiveStore = create<LiveState>()(
         ),
         manualEvidence: s.manualEvidence,
         validationRecords: s.validationRecords,
+        snapshots: s.snapshots,
       }),
     },
   ),
