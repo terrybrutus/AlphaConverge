@@ -1,5 +1,5 @@
 import { SAMPLE_UNIVERSE } from "@/data/sampleUniverse";
-import { MICRO_SIGNAL, scoreTicker } from "@/lib/convergence";
+import { MICRO_SIGNAL, SENT_SIGNAL, scoreTicker } from "@/lib/convergence";
 import { buildLiveTicker } from "@/lib/liveTicker";
 import type { Candle } from "@/lib/technicals";
 import { describe, expect, it } from "vitest";
@@ -140,5 +140,32 @@ describe("convergence integrity", () => {
 
     expect(play.surfaced).toBe(true);
     expect(play.instrument).not.toBe("pass");
+  });
+
+  it("allows sourced news sentiment and attention to make sentiment align-capable", () => {
+    const play = scoreTicker({
+      ...SAMPLE_UNIVERSE[0],
+      sample: false,
+      availability: {
+        technical: true,
+        fundamental: false,
+        microstructure: false,
+        sentiment: true,
+        macro: false,
+      },
+      signalAvailability: {
+        [SENT_SIGNAL.reddit]: true,
+        [SENT_SIGNAL.news]: true,
+        [SENT_SIGNAL.trends]: false,
+      },
+      redditMentionVelocity: 2,
+      newsSentiment: 0.5,
+    });
+    const sentiment = play.categories.find(
+      (category) => category.key === "sentiment",
+    );
+
+    expect(sentiment?.coverage).toBe(75);
+    expect(sentiment?.aligned).toBe(true);
   });
 });

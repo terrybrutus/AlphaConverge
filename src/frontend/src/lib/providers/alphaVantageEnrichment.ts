@@ -1,10 +1,14 @@
-import { FUND_SIGNAL, SENT_SIGNAL } from "@/lib/convergence";
+import { FUND_SIGNAL, MICRO_SIGNAL, SENT_SIGNAL } from "@/lib/convergence";
 import type { FundamentalData, SentimentData } from "@/lib/providers/finnhub";
 import {
   emptyFundamentalAvailability,
   emptySentimentAvailability,
   revenueAcceleration,
 } from "@/lib/providers/fundamentals";
+import {
+  type MicrostructureData,
+  emptyMicroAvailability,
+} from "@/lib/providers/microstructure";
 
 const BASE = "https://www.alphavantage.co/query";
 
@@ -77,6 +81,42 @@ export async function fetchAlphaVantageSentiment(
     fields.newsSentiment =
       scores.reduce((sum, score) => sum + score, 0) / scores.length;
     availability[SENT_SIGNAL.news] = true;
+  }
+  return { fields, availability };
+}
+
+export async function fetchAlphaVantageMicrostructure(
+  symbol: string,
+  apiKey: string,
+): Promise<MicrostructureData> {
+  const fields: MicrostructureData["fields"] = {};
+  const availability = emptyMicroAvailability();
+  const data = await query(
+    { function: "REALTIME_OPTIONS", symbol: symbol.toUpperCase() },
+    apiKey,
+  );
+  const rows = (data.data ?? []) as Array<{
+    type?: string;
+    volume?: string;
+    open_interest?: string;
+  }>;
+  if (rows.length > 0) {
+    const calls = rows.filter((row) => row.type?.toLowerCase() === "call");
+    const puts = rows.filter((row) => row.type?.toLowerCase() === "put");
+    const volume = (values: typeof rows) =>
+      values.reduce((sum, row) => sum + Number(row.volume ?? 0), 0);
+    const openInterest = (values: typeof rows) =>
+      values.reduce((sum, row) => sum + Number(row.open_interest ?? 0), 0);
+    const callVolume = volume(calls);
+    const putVolume = volume(puts);
+    fields.unusualCallActivity =
+      callVolume > 0 && callVolume / Math.max(1, openInterest(calls)) >= 1.5;
+    fields.putCallShift =
+      callVolume + putVolume > 0
+        ? (putVolume - callVolume) / (putVolume + callVolume)
+        : 0;
+    availability[MICRO_SIGNAL.unusualCall] = true;
+    availability[MICRO_SIGNAL.putCall] = true;
   }
   return { fields, availability };
 }

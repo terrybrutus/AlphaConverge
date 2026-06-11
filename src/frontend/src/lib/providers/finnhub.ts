@@ -145,22 +145,31 @@ export async function fetchSentiment(
   const key = encodeURIComponent(apiKey);
   const fields: SentimentData["fields"] = {};
   const availability: Record<string, boolean> = {
-    [SENT_SIGNAL.reddit]: false, // Reddit API is CORS-blocked from the browser
+    [SENT_SIGNAL.reddit]: false,
     [SENT_SIGNAL.news]: false,
     [SENT_SIGNAL.trends]: false, // Google Trends has no browser-usable API
   };
 
-  // News sentiment from recent company headlines.
+  // News sentiment and attention acceleration from dated company headlines.
   try {
     const news = (await getJson(
-      `${BASE}/company-news?symbol=${sym}&from=${isoDaysAgo(14)}&to=${isoDaysAgo(0)}&token=${key}`,
-    )) as Array<{ headline?: string; summary?: string }>;
+      `${BASE}/company-news?symbol=${sym}&from=${isoDaysAgo(28)}&to=${isoDaysAgo(0)}&token=${key}`,
+    )) as Array<{ headline?: string; summary?: string; datetime?: number }>;
     if (Array.isArray(news) && news.length > 0) {
+      const cutoff = Date.now() - 14 * 24 * 3600 * 1000;
       const headlines = news
+        .filter((item) => (item.datetime ?? 0) * 1000 >= cutoff)
         .slice(0, 40)
         .map((n) => `${n.headline ?? ""} ${n.summary ?? ""}`);
       fields.newsSentiment = headlineSentiment(headlines);
       availability[SENT_SIGNAL.news] = true;
+      const recent = news.filter(
+        (item) => (item.datetime ?? 0) * 1000 >= cutoff,
+      ).length;
+      const prior = news.length - recent;
+      fields.redditMentionVelocity =
+        prior > 0 ? (recent - prior) / Math.sqrt(prior) : recent > 0 ? 1 : 0;
+      availability[SENT_SIGNAL.reddit] = true;
     }
   } catch {
     // leave unavailable

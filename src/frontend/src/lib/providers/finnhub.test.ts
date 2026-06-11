@@ -29,13 +29,19 @@ describe("Finnhub evidence independence", () => {
     const fetchMock = vi.fn(async (_input: string) => ({
       ok: true,
       status: 200,
-      json: async () => [{ headline: "Company wins contract" }],
+      json: async () => [
+        {
+          headline: "Company wins contract",
+          datetime: Math.floor(Date.now() / 1000),
+        },
+      ],
     }));
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await fetchSentiment("TEST", "key");
 
     expect(result.availability[SENT_SIGNAL.news]).toBe(true);
+    expect(result.availability[SENT_SIGNAL.reddit]).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0][0])).toContain("company-news");
   });

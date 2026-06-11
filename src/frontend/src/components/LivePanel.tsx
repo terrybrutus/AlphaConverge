@@ -2,6 +2,7 @@ import { PlayCard } from "@/components/PlayCard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { STARTER_UNIVERSE } from "@/data/starterUniverse";
+import { scoreTicker } from "@/lib/convergence";
 import { useLiveStore } from "@/lib/liveStore";
 import { analyzeTickerImport } from "@/lib/research";
 import { evidenceIsFresh } from "@/lib/research";
@@ -176,6 +177,22 @@ export function LivePanel() {
     store.priceProvider === "twelveData"
       ? Math.ceil((previewNew.length * 8) / 60)
       : Math.ceil((previewNew.length * 1.5) / 60);
+  const capability = COMPANY_KEYS.map((key) => {
+    const category = store.symbols
+      .map((symbol) => store.entries[symbol]?.raw)
+      .filter((raw) => !!raw)
+      .map((raw) =>
+        scoreTicker(raw).categories.find((item) => item.key === key),
+      )
+      .filter((item) => !!item)
+      .sort((a, b) => b.coverage - a.coverage)[0];
+    return {
+      key,
+      label: category?.label ?? key,
+      coverage: category?.coverage ?? 0,
+      alignCapable: (category?.coverage ?? 0) >= 50,
+    };
+  });
 
   const submitTicker = (event: FormEvent) => {
     event.preventDefault();
@@ -305,6 +322,53 @@ export function LivePanel() {
       </section>
 
       <section className="space-y-4">
+        {store.scanQueue.status === "paused" &&
+          store.scanQueue.pending.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/40 bg-accent/10 p-4">
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Unfinished scan restored
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {store.scanQueue.pending.length} tickers remain. Your list and
+                  completed results were preserved.
+                </p>
+              </div>
+              <Button type="button" onClick={() => void store.resumeScan()}>
+                <PlayIcon className="mr-1.5 h-4 w-4" /> Resume remaining scan
+              </Button>
+            </div>
+          )}
+        <div className="rounded-xl border border-border bg-card p-4">
+          <h3 className="font-display text-sm font-semibold text-foreground">
+            Observed provider capability
+          </h3>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Highest automated coverage actually returned by your configured
+            accounts in these results. At least 50% is required before a family
+            can align.
+          </p>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+            {capability.map((item) => (
+              <div
+                key={item.key}
+                className={`rounded-lg border p-3 ${
+                  item.alignCapable
+                    ? "border-primary/40 bg-primary/10"
+                    : "border-border bg-muted/30"
+                }`}
+              >
+                <p className="text-xs font-semibold text-foreground">
+                  {item.label}
+                </p>
+                <p className="font-mono text-sm">
+                  {item.coverage}% measurable ·{" "}
+                  {item.alignCapable ? "align-capable" : "not align-capable"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
           {[
             ["Surfaced", surfaced.length],

@@ -27,6 +27,8 @@ export function CredentialVault() {
   const setTiingoKey = useLiveStore((s) => s.setTiingoKey);
   const setAiKey = useLiveStore((s) => s.setAiKey);
   const setPriceProvider = useLiveStore((s) => s.setPriceProvider);
+  const resumeScan = useLiveStore((s) => s.resumeScan);
+  const pendingScanCount = useLiveStore((s) => s.scanQueue.pending.length);
   const [passphrase, setPassphrase] = useState("");
   const [status, setStatus] = useState<string>();
   const [unlocked, setUnlocked] = useState(false);
@@ -102,7 +104,14 @@ export function CredentialVault() {
       setPriceProvider(payload.priceProvider);
       setPassphrase("");
       setUnlocked(true);
-      setStatus("Vault unlocked for this session");
+      if (pendingScanCount > 0) {
+        setStatus(
+          `Vault unlocked. Resuming ${pendingScanCount} remaining tickers.`,
+        );
+        void resumeScan();
+      } else {
+        setStatus("Vault unlocked for this session");
+      }
     } catch (e) {
       setStatus((e as Error).message);
     }

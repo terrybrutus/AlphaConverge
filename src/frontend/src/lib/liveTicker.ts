@@ -1,6 +1,7 @@
 import { MICRO_SIGNAL } from "@/lib/convergence";
 import type { MacroFacts } from "@/lib/macro";
 import type { FundamentalData, SentimentData } from "@/lib/providers/finnhub";
+import type { MicrostructureData } from "@/lib/providers/microstructure";
 import { type Candle, computeTechnicals } from "@/lib/technicals";
 import type { TickerRaw } from "@/types/ticker";
 
@@ -28,12 +29,14 @@ export function buildLiveTicker(
     source: string;
     fundamentals?: FundamentalData;
     sentiment?: SentimentData;
+    microstructure?: MicrostructureData;
     macro?: MacroFacts;
   },
 ): TickerRaw {
   const tech = computeTechnicals(candles);
   const f = opts.fundamentals;
   const sent = opts.sentiment;
+  const micro = opts.microstructure;
   const macro = opts.macro;
   const macroHasData =
     !!macro && Object.values(macro.availability).some(Boolean);
@@ -43,6 +46,7 @@ export function buildLiveTicker(
     ...(sent?.availability ?? {}),
     ...(macro?.availability ?? {}),
     ...LIVE_MICRO_AVAILABILITY,
+    ...(micro?.availability ?? {}),
   };
 
   return {
@@ -68,11 +72,11 @@ export function buildLiveTicker(
     psVsSector: f?.fields.psVsSector ?? 0,
     insiderBuy90d: f?.fields.insiderBuy90d ?? false,
     instOwnershipChange: f?.fields.instOwnershipChange ?? 0,
-    shortInterestPct: 0,
+    shortInterestPct: micro?.fields.shortInterestPct ?? 0,
 
-    unusualCallActivity: false,
-    darkPoolAccumulation: false,
-    putCallShift: 0,
+    unusualCallActivity: micro?.fields.unusualCallActivity ?? false,
+    darkPoolAccumulation: micro?.fields.darkPoolAccumulation ?? false,
+    putCallShift: micro?.fields.putCallShift ?? 0,
     obvRising: tech.obvRising, // price-derived technical signal
 
     // Sentiment — real where a source filled it; per-signal availability marks
@@ -87,15 +91,16 @@ export function buildLiveTicker(
     macroRiskOn: macro?.fields.macroRiskOn ?? false,
     sectorNarrative: false,
 
-    impliedVolatilityPctile: 0,
-    instrumentDataAvailable: false,
+    impliedVolatilityPctile: micro?.fields.impliedVolatilityPctile ?? 0,
+    instrumentDataAvailable:
+      !!micro && Object.values(micro.availability).some(Boolean),
 
     sample: false,
     source: opts.source,
     availability: {
       technical: true,
       fundamental: !!f,
-      microstructure: false,
+      microstructure: !!micro,
       sentiment: !!sent,
       macro: macroHasData,
     },

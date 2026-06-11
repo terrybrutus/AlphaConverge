@@ -156,7 +156,7 @@ export function SettingsPage() {
             active={!!finnhubKey}
             onSave={setFinnhubKey}
             signup="https://finnhub.io/register"
-            note="Adds insider transactions, company profile, and recent headline sentiment. Unsupported Finnhub fields remain unknown."
+            note="Adds insider transactions, company profile, headline sentiment, and news-attention acceleration. These two news calculations make Sentiment align-capable when Finnhub returns enough dated headlines."
           />
           <KeyForm
             label="Financial Modeling Prep fundamentals key"

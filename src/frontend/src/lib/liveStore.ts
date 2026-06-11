@@ -12,6 +12,7 @@ import { type MacroFacts, fetchMacro } from "@/lib/macro";
 import { alphaVantageProvider } from "@/lib/providers/alphaVantage";
 import {
   fetchAlphaVantageFundamentals,
+  fetchAlphaVantageMicrostructure,
   fetchAlphaVantageSentiment,
 } from "@/lib/providers/alphaVantageEnrichment";
 import {
@@ -26,6 +27,7 @@ import {
   mergeFundamentals,
   mergeSentiment,
 } from "@/lib/providers/fundamentals";
+import type { MicrostructureData } from "@/lib/providers/microstructure";
 import { twelveDataProvider } from "@/lib/providers/twelveData";
 import {
   type ManualEvidence,
@@ -383,6 +385,7 @@ export const useLiveStore = create<LiveState>()(
           let sector: string | undefined;
           let fundamentals: FundamentalData | undefined;
           let sentiment: SentimentData | undefined;
+          let microstructure: MicrostructureData | undefined;
           let source = provider.name;
           const { finnhubKey, fmpKey } = get();
           if (finnhubKey) {
@@ -410,11 +413,11 @@ export const useLiveStore = create<LiveState>()(
 
           if (fmpKey) {
             try {
-              fundamentals = mergeFundamentals(
-                fundamentals,
-                await fetchFmpFundamentals(symbol, fmpKey),
-              );
-              source = `${source} + FMP`;
+              const fmp = await fetchFmpFundamentals(symbol, fmpKey);
+              fundamentals = mergeFundamentals(fundamentals, fmp);
+              if (Object.values(fmp.availability).some(Boolean)) {
+                source = `${source} + FMP`;
+              }
             } catch {
               // Plan-gated or unavailable FMP fields remain unknown.
             }
@@ -424,11 +427,14 @@ export const useLiveStore = create<LiveState>()(
           // across a broad queue. Use these extra calls only for one ticker.
           if (priceProvider === "alphaVantage" && get().scanQueue.total <= 1) {
             try {
-              fundamentals = mergeFundamentals(
-                fundamentals,
-                await fetchAlphaVantageFundamentals(symbol, apiKey),
+              const alphaFundamentals = await fetchAlphaVantageFundamentals(
+                symbol,
+                apiKey,
               );
-              source = `${source} + Alpha Vantage fundamentals`;
+              fundamentals = mergeFundamentals(fundamentals, alphaFundamentals);
+              if (Object.values(alphaFundamentals.availability).some(Boolean)) {
+                source = `${source} + Alpha Vantage fundamentals`;
+              }
             } catch {
               // Leave unknown on quota/plan errors.
             }
@@ -439,6 +445,17 @@ export const useLiveStore = create<LiveState>()(
               );
             } catch {
               // Leave unknown on quota/plan errors.
+            }
+            try {
+              microstructure = await fetchAlphaVantageMicrostructure(
+                symbol,
+                apiKey,
+              );
+              if (Object.values(microstructure.availability).some(Boolean)) {
+                source = `${source} + Alpha Vantage options`;
+              }
+            } catch {
+              // Options are often plan-gated; leave unknown.
             }
           }
 
@@ -457,6 +474,7 @@ export const useLiveStore = create<LiveState>()(
             source,
             fundamentals,
             sentiment,
+            microstructure,
             macro,
           });
           const play = scoreTicker(
@@ -668,7 +686,7 @@ export const useLiveStore = create<LiveState>()(
     }),
     {
       name: "alphaconverge-live",
-      version: 5,
+      version: 6,
       storage: createJSONStorage(() =>
         typeof localStorage === "undefined" ? memoryStorage : localStorage,
       ),
@@ -681,7 +699,12 @@ export const useLiveStore = create<LiveState>()(
           manualEvidence: prior.manualEvidence ?? {},
           validationRecords: prior.validationRecords ?? [],
           snapshots: prior.snapshots ?? {},
-          scanQueue: { status: "idle", pending: [], completed: 0, total: 0 },
+          scanQueue: prior.scanQueue
+            ? {
+                ...prior.scanQueue,
+                status: prior.scanQueue.pending.length > 0 ? "paused" : "idle",
+              }
+            : { status: "idle", pending: [], completed: 0, total: 0 },
         } as unknown as LiveState;
       },
       partialize: (s) => ({
@@ -695,6 +718,10 @@ export const useLiveStore = create<LiveState>()(
         manualEvidence: s.manualEvidence,
         validationRecords: s.validationRecords,
         snapshots: s.snapshots,
+        scanQueue: {
+          ...s.scanQueue,
+          status: s.scanQueue.pending.length > 0 ? "paused" : "idle",
+        },
       }),
     },
   ),

@@ -68,14 +68,19 @@ Provider facts are merged signal-by-signal. One provider returning no data
 cannot erase a signal sourced by another provider.
 
 - **Finnhub** supplies company profile, insider transactions, and recent
-  headline sentiment. The app does not reinterpret unrelated Finnhub metrics as
-  revenue acceleration or estimate revisions.
+  headline sentiment. It also compares the latest 14 days of company-news
+  volume with the preceding 14 days to measure news-attention acceleration.
+  Together those two sourced signals make Sentiment align-capable. The app does
+  not reinterpret unrelated Finnhub metrics as revenue acceleration or estimate
+  revisions.
 - **FMP** is queried for quarterly revenue acceleration and historical P/E
   comparison. Its free Basic plan allows 250 calls/day, but fundamental
   endpoints may be plan-gated. Rejected endpoints remain unknown.
 - **Alpha Vantage free** is queried for quarterly revenue acceleration and news
-  sentiment only during a single-ticker Alpha Vantage scan. Its roughly
-  25-request/day free limit makes enrichment across a broad list impractical.
+  sentiment only during a single-ticker Alpha Vantage scan. It also attempts
+  the realtime options endpoint to measure unusual call volume and call-vs-put
+  positioning; that endpoint may be plan-gated. Its roughly 25-request/day free
+  limit makes enrichment across a broad list impractical.
 - **SimFin** and **Tiingo** keys can be stored in the encrypted vault, but they
   are not called during browser scans yet. SimFin is better suited to a bulk
   fundamentals ingestion workflow; Tiingo currently duplicates price/news
@@ -89,6 +94,10 @@ The encrypted vault can be overwritten at any time by saving again with the
 keys active in the current session. Its passphrase remains unrecoverable. An
 optional hint is stored only in the current browser and should never contain
 the passphrase itself.
+
+Unfinished scan queues are stored in the browser. Reopening AlphaConverge
+restores the remaining tickers as a paused queue so they can be resumed without
+reimporting the list. API keys still must be unlocked for the new session.
 
 True whole-market nightly scanning (all ~8,000 US equities) is still a
 big-ticket item. Prefer an external worker plus paid data; do not add a canister

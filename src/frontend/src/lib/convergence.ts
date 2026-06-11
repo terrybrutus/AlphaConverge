@@ -49,7 +49,7 @@ export const FUND_SIGNAL = {
 
 // Stable names for sentiment sub-signals, same purpose as FUND_SIGNAL.
 export const SENT_SIGNAL = {
-  reddit: "Reddit mention spike",
+  reddit: "News attention accelerating",
   news: "News sentiment positive",
   trends: "Search interest rising",
 } as const;
@@ -288,7 +288,7 @@ function sentiment(t: TickerRaw): CategoryResult {
     {
       name: SENT_SIGNAL.reddit,
       detail:
-        "Mention velocity on r/wallstreetbets / r/stocks is well above its trailing baseline.",
+        "Recent company-news volume is accelerating versus the preceding period.",
       weight: 0.4,
       fired: t.redditMentionVelocity >= 1,
       value: `${t.redditMentionVelocity.toFixed(1)}σ`,
