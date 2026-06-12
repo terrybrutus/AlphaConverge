@@ -68,6 +68,7 @@ export function ValidationPage() {
                 <th className="p-3">Ticker</th>
                 <th className="p-3">Captured</th>
                 <th className="p-3">Evidence</th>
+                <th className="p-3">Best model at capture</th>
                 <th className="p-3">Coverage</th>
                 <th className="p-3">Manual facts</th>
                 <th className="p-3">Age</th>
@@ -87,6 +88,17 @@ export function ValidationPage() {
                     {new Date(record.capturedAt).toLocaleDateString()}
                   </td>
                   <td className="p-3">{record.categoriesAligned}/4</td>
+                  <td className="p-3">
+                    {record.primaryModelLabel ? (
+                      <>
+                        {record.primaryModelLabel} · {record.primaryModelScore}{" "}
+                        fit · {record.primaryModelCoverage}% observable
+                        {record.primaryModelQualified ? " · qualified" : ""}
+                      </>
+                    ) : (
+                      "Legacy record"
+                    )}
+                  </td>
                   <td className="p-3">{record.dataCoverage}%</td>
                   <td className="p-3">{record.manualSignalCount}</td>
                   <td className="p-3">{maturedDays(record)} days</td>
@@ -98,7 +110,7 @@ export function ValidationPage() {
               {records.length === 0 && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="p-6 text-center text-muted-foreground"
                   >
                     No tracked setups yet. Open a live ticker and click Track

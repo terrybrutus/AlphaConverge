@@ -22,6 +22,8 @@ export interface TickerRaw {
   psVsSector: number; // ratio vs sector (<1 = cheaper)
   insiderBuy90d: boolean;
   instOwnershipChange: number; // pct change in institutional ownership
+  operatingMarginAccel?: number; // pct-point change versus year-ago quarter
+  earningsSurprisePct?: number; // latest reported EPS surprise percentage
   shortInterestPct: number; // % of float short
 
   // 3. Market microstructure
@@ -125,6 +127,36 @@ export interface Play {
   source?: string; // where the underlying data came from
   categoriesWithData: number; // how many of the 5 categories have a live source
   dataCoverage: number; // weighted coverage across independent evidence, 0..100
+  opportunityModels: OpportunityModelResult[];
+  primaryModel?: OpportunityModelResult;
+}
+
+export type OpportunityModelKey =
+  | "fundamentalInflection"
+  | "qualityMomentum"
+  | "valueRecovery"
+  | "catalystUnderreaction"
+  | "earlyReversal";
+
+export interface OpportunityModelSignal {
+  name: string;
+  detail: string;
+  weight: number;
+  available: boolean;
+  fired: boolean;
+  window: string;
+}
+
+export interface OpportunityModelResult {
+  key: OpportunityModelKey;
+  label: string;
+  description: string;
+  score: number;
+  coverage: number;
+  qualified: boolean;
+  testable: boolean;
+  blocker: string;
+  signals: OpportunityModelSignal[];
 }
 
 export type ProviderAuditStatus =

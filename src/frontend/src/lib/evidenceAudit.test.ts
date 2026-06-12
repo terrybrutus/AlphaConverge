@@ -92,6 +92,7 @@ function play(): Play {
     sample: false,
     categoriesWithData: 4,
     dataCoverage: 49,
+    opportunityModels: [],
   };
 }
 

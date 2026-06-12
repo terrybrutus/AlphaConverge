@@ -1,4 +1,5 @@
 import { FUND_SIGNAL, SENT_SIGNAL } from "@/lib/convergence";
+import { MODEL_SIGNAL } from "@/lib/modelSignals";
 import type { FundamentalData, SentimentData } from "@/lib/providers/finnhub";
 
 export function mergeFundamentals(
@@ -45,6 +46,8 @@ export function emptyFundamentalAvailability(): Record<string, boolean> {
     [FUND_SIGNAL.psSector]: false,
     [FUND_SIGNAL.insider]: false,
     [FUND_SIGNAL.inst]: false,
+    [MODEL_SIGNAL.profitability]: false,
+    [MODEL_SIGNAL.catalyst]: false,
   };
 }
 

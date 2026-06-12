@@ -12,6 +12,8 @@ export interface FundamentalData {
     psVsSector?: number;
     insiderBuy90d?: boolean;
     instOwnershipChange?: number;
+    operatingMarginAccel?: number;
+    earningsSurprisePct?: number;
   };
   // Keyed by FUND_SIGNAL names — true only for signals we actually sourced.
   availability: Record<string, boolean>;

@@ -1,3 +1,7 @@
+import {
+  primaryOpportunityModel,
+  scoreOpportunityModels,
+} from "@/lib/opportunityModels";
 import type {
   CategoryKey,
   CategoryResult,
@@ -523,6 +527,8 @@ export function scoreTicker(t: TickerRaw): Play {
   );
 
   const { instrument, rationale } = chooseInstrument(stage, t, surfaced);
+  const opportunityModels = scoreOpportunityModels(t);
+  const primaryModel = primaryOpportunityModel(opportunityModels);
 
   return {
     symbol: t.symbol,
@@ -543,6 +549,8 @@ export function scoreTicker(t: TickerRaw): Play {
     source: t.source,
     categoriesWithData: categories.filter((c) => c.available).length,
     dataCoverage,
+    opportunityModels,
+    primaryModel,
   };
 }
 

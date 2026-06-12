@@ -429,7 +429,7 @@ export const useLiveStore = create<LiveState>()(
                 status: count > 0 ? "partial" : "error",
                 detail:
                   count > 0
-                    ? `${count} of 6 Fundamental signals became measurable.`
+                    ? `${count} fundamental or opportunity-model signals became measurable.`
                     : "Request returned no measurable Fundamental signals.",
               });
             } catch (error) {
@@ -494,7 +494,7 @@ export const useLiveStore = create<LiveState>()(
                 status: count > 0 ? "partial" : "error",
                 detail:
                   count > 0
-                    ? `${count} of 6 Fundamental signals became measurable.`
+                    ? `${count} fundamental or opportunity-model signals became measurable.`
                     : "No usable revenue acceleration or historical valuation data returned; endpoints may be plan-gated.",
               });
             } catch (error) {
@@ -762,6 +762,11 @@ export const useLiveStore = create<LiveState>()(
                 ).length,
                 latestPrice: play.price,
                 latestAt: now,
+                primaryModelKey: play.primaryModel?.key,
+                primaryModelLabel: play.primaryModel?.label,
+                primaryModelScore: play.primaryModel?.score,
+                primaryModelCoverage: play.primaryModel?.coverage,
+                primaryModelQualified: play.primaryModel?.qualified,
               },
             ],
           };

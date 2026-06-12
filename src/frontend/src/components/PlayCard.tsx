@@ -49,6 +49,17 @@ export function PlayCard({ play, rank }: { play: Play; rank: number }) {
                   <CircleDot className="w-3 h-3" /> Candidate, not confirmed
                 </span>
               )}
+              {play.primaryModel && (
+                <span
+                  className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wide ${
+                    play.primaryModel.qualified
+                      ? "border-primary/40 bg-primary/10 text-primary"
+                      : "border-border bg-muted/40 text-muted-foreground"
+                  }`}
+                >
+                  {play.primaryModel.label}: {play.primaryModel.score} fit
+                </span>
+              )}
             </div>
             <p className="text-sm text-muted-foreground truncate">
               {play.name} · {play.sector}
@@ -98,6 +109,11 @@ export function PlayCard({ play, rank }: { play: Play; rank: number }) {
         <p className="mt-3 text-sm text-muted-foreground leading-relaxed line-clamp-3">
           {play.thesis}
         </p>
+        {play.primaryModel && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Best model: {play.primaryModel.blocker}
+          </p>
+        )}
 
         {/* Fatigue */}
         {play.fatigueWarning && (

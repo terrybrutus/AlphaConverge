@@ -28,6 +28,7 @@ import { type FormEvent, useMemo, useState } from "react";
 
 type ResultView = "all" | "surfaced" | "candidates" | "watch";
 type ResultSort =
+  | "model"
   | "score"
   | "coverage"
   | "aligned"
@@ -88,7 +89,18 @@ function missingWork(play: Play): string {
 
 function exportCsv(plays: Play[]) {
   const rows = [
-    ["Ticker", "Score", "Coverage", "Evidence families", "Surfaced", "Stage"],
+    [
+      "Ticker",
+      "Score",
+      "Coverage",
+      "Evidence families",
+      "Surfaced",
+      "Stage",
+      "Best model",
+      "Model fit",
+      "Model coverage",
+      "Model qualified",
+    ],
     ...plays.map((play) => [
       play.symbol,
       play.convergenceScore,
@@ -96,6 +108,10 @@ function exportCsv(plays: Play[]) {
       play.categoriesAligned,
       play.surfaced ? "Yes" : "No",
       play.stage,
+      play.primaryModel?.label ?? "",
+      play.primaryModel?.score ?? "",
+      play.primaryModel?.coverage ?? "",
+      play.primaryModel?.qualified ? "Yes" : "No",
     ]),
   ];
   const blob = new Blob(
@@ -115,7 +131,7 @@ export function LivePanel() {
   const [draft, setDraft] = useState("");
   const [previewText, setPreviewText] = useState("");
   const [view, setView] = useState<ResultView>("all");
-  const [sort, setSort] = useState<ResultSort>("score");
+  const [sort, setSort] = useState<ResultSort>("model");
   const [selected, setSelected] = useState<string[]>([]);
   const preview = analyzeTickerImport(previewText);
 
@@ -131,6 +147,13 @@ export function LivePanel() {
           : 0;
       };
       if (sort === "coverage") return b.dataCoverage - a.dataCoverage;
+      if (sort === "model")
+        return (
+          Number(b.primaryModel?.qualified ?? false) -
+            Number(a.primaryModel?.qualified ?? false) ||
+          (b.primaryModel?.score ?? 0) - (a.primaryModel?.score ?? 0) ||
+          (b.primaryModel?.coverage ?? 0) - (a.primaryModel?.coverage ?? 0)
+        );
       if (sort === "aligned") return b.categoriesAligned - a.categoriesAligned;
       if (sort === "closest")
         return (
@@ -410,6 +433,7 @@ export function LivePanel() {
             onChange={(event) => setSort(event.target.value as ResultSort)}
             className="rounded-md border border-border bg-background px-2 py-1.5 text-xs"
           >
+            <option value="model">Best opportunity-model fit</option>
             <option value="score">Highest evidence strength</option>
             <option value="coverage">Highest data confidence</option>
             <option value="aligned">Evidence families aligned</option>
@@ -551,6 +575,13 @@ export function LivePanel() {
                   {maximumObservableScore(play)} currently observable.{" "}
                   {surfacedBlocker(play)}
                 </p>
+                {play.primaryModel && (
+                  <p className="mt-1 rounded-md border border-border bg-muted/30 px-2 py-1 text-xs text-muted-foreground">
+                    Best model: {play.primaryModel.label} ·{" "}
+                    {play.primaryModel.score} fit · {play.primaryModel.coverage}
+                    % observable. {play.primaryModel.blocker}
+                  </p>
+                )}
               </div>
             );
           })}

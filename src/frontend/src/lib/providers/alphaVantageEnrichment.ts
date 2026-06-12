@@ -1,4 +1,5 @@
 import { FUND_SIGNAL, MICRO_SIGNAL, SENT_SIGNAL } from "@/lib/convergence";
+import { MODEL_SIGNAL } from "@/lib/modelSignals";
 import type { FundamentalData, SentimentData } from "@/lib/providers/finnhub";
 import {
   emptyFundamentalAvailability,
@@ -11,6 +12,15 @@ import {
 } from "@/lib/providers/microstructure";
 
 const BASE = "https://www.alphavantage.co/query";
+
+function withinDays(date: string | undefined, days: number): boolean {
+  if (!date) return false;
+  const observed = new Date(`${date.slice(0, 10)}T00:00:00Z`).getTime();
+  return (
+    Number.isFinite(observed) &&
+    Date.now() - observed <= days * 24 * 60 * 60 * 1000
+  );
+}
 
 async function query(
   params: Record<string, string>,
@@ -40,14 +50,58 @@ export async function fetchAlphaVantageFundamentals(
     apiKey,
   );
   const reports = (data.quarterlyReports ?? []) as Array<{
+    fiscalDateEnding?: string;
     totalRevenue?: string;
+    operatingIncome?: string;
   }>;
   const acceleration = revenueAcceleration(
     reports.map((report) => Number(report.totalRevenue)),
   );
-  if (acceleration !== undefined) {
+  if (
+    acceleration !== undefined &&
+    withinDays(reports[0]?.fiscalDateEnding, 150)
+  ) {
     fields.revenueGrowthAccel = acceleration;
     availability[FUND_SIGNAL.revAccel] = true;
+  }
+  const latest = reports[0];
+  const yearAgo = reports[4];
+  const latestRevenue = Number(latest?.totalRevenue);
+  const latestOperating = Number(latest?.operatingIncome);
+  const yearAgoRevenue = Number(yearAgo?.totalRevenue);
+  const yearAgoOperating = Number(yearAgo?.operatingIncome);
+  if (
+    latestRevenue > 0 &&
+    yearAgoRevenue > 0 &&
+    Number.isFinite(latestOperating) &&
+    Number.isFinite(yearAgoOperating) &&
+    withinDays(latest?.fiscalDateEnding, 150)
+  ) {
+    fields.operatingMarginAccel =
+      (latestOperating / latestRevenue - yearAgoOperating / yearAgoRevenue) *
+      100;
+    availability[MODEL_SIGNAL.profitability] = true;
+  }
+  try {
+    const earnings = await query(
+      { function: "EARNINGS", symbol: symbol.toUpperCase() },
+      apiKey,
+    );
+    const latestEarning = (
+      earnings.quarterlyEarnings as
+        | Array<{ reportedDate?: string; surprisePercentage?: string }>
+        | undefined
+    )?.[0];
+    const surprise = Number(latestEarning?.surprisePercentage);
+    if (
+      Number.isFinite(surprise) &&
+      withinDays(latestEarning?.reportedDate, 70)
+    ) {
+      fields.earningsSurprisePct = surprise;
+      availability[MODEL_SIGNAL.catalyst] = true;
+    }
+  } catch {
+    // Preserve the statement-derived facts when the earnings call is limited.
   }
   return { fields, availability };
 }

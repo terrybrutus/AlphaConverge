@@ -121,18 +121,31 @@ export function MethodologyPage() {
             The method behind the madness
           </h1>
           <p className="text-muted-foreground text-base md:text-lg leading-relaxed">
-            Every stock that exploded shared a fingerprint: several independent
-            things lined up at the same time. One signal is noise. The edge is{" "}
+            AlphaConverge tests multiple opportunity hypotheses instead of
+            forcing every stock into one fingerprint. One signal is noise. The
+            useful question is whether compatible, sufficiently sourced evidence
+            overlaps within an appropriate window. The edge is{" "}
             <span className="text-foreground font-medium">convergence</span> —
-            independent categories all pointing the same way at once.
-            AlphaConverge only surfaces a stock when price structure and at
-            least{" "}
+            independent categories pointing the same way without counting the
+            same price fact repeatedly. The strict independent-evidence surface
+            still requires price structure and at least{" "}
             <span className="text-foreground font-medium">
               two independent non-price company evidence families
             </span>{" "}
             agree with sufficient data coverage.
           </p>
         </motion.div>
+
+        <div className="mt-10">
+          <SectionTitle>Separate opportunity models</SectionTitle>
+          <div className="rounded-xl border border-border bg-card p-5 text-sm leading-relaxed text-muted-foreground">
+            Fundamental Inflection, Value Recovery, Quality Momentum, Catalyst
+            Underreaction, and Early Reversal are evaluated separately. Each has
+            required confirmations and evidence windows. A model with a missing
+            required source remains untestable; model fit is not a historical
+            win probability.
+          </div>
+        </div>
 
         {/* Dimensions */}
         <div className="mt-10">
@@ -228,17 +241,17 @@ export function MethodologyPage() {
           <SectionTitle>What live data can confirm today</SectionTitle>
           <div className="rounded-xl border border-accent/30 bg-accent/10 p-5 text-sm leading-relaxed text-accent/90">
             <p>
-              Live Technical is fully connected. Finnhub currently supplies
-              insider buying (18% of Fundamental) and headline sentiment (35% of
-              Sentiment). Independent Microstructure has no connected live
-              source. Because a family needs at least 50% coverage to align, the
-              current free-source wiring cannot produce a strict Surfaced play.
+              Live Technical is fully connected. Finnhub supplies insider
+              activity and recent news evidence. FMP and single-ticker Alpha
+              Vantage enrichment attempt revenue acceleration, operating-margin
+              improvement, historical valuation, and recent earnings surprise.
+              Alpha Vantage also attempts options microstructure when its
+              account permits the endpoint.
             </p>
             <p className="mt-2">
-              The Screener therefore labels technically aligned names as
-              Candidates for further research without pretending they have
-              independent confirmation. Illustrated complete setups live on the
-              Examples page and remain clearly marked Preview.
+              Provider access and free-tier limits vary, so every family and
+              opportunity model reports its actual observability. Missing or
+              stale evidence remains unknown and never becomes a positive.
             </p>
           </div>
         </div>

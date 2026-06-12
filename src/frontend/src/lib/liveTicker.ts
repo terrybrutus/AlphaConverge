@@ -72,6 +72,8 @@ export function buildLiveTicker(
     psVsSector: f?.fields.psVsSector ?? 0,
     insiderBuy90d: f?.fields.insiderBuy90d ?? false,
     instOwnershipChange: f?.fields.instOwnershipChange ?? 0,
+    operatingMarginAccel: f?.fields.operatingMarginAccel ?? 0,
+    earningsSurprisePct: f?.fields.earningsSurprisePct ?? 0,
     shortInterestPct: micro?.fields.shortInterestPct ?? 0,
 
     unusualCallActivity: micro?.fields.unusualCallActivity ?? false,

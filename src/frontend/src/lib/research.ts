@@ -223,6 +223,11 @@ export interface ValidationRecord {
   manualSignalCount: number;
   latestPrice: number;
   latestAt: number;
+  primaryModelKey?: string;
+  primaryModelLabel?: string;
+  primaryModelScore?: number;
+  primaryModelCoverage?: number;
+  primaryModelQualified?: boolean;
 }
 
 export function maturedDays(record: ValidationRecord): number {

@@ -26,6 +26,29 @@ from its returned coverage, and records provider requests that succeeded,
 failed, were plan-gated, or were deliberately skipped to protect a free quota.
 This diagnostic layer does not award points or loosen alignment thresholds.
 
+## Opportunity models
+
+AlphaConverge no longer assumes every valid opportunity must resemble an early
+bottom reversal. The same sourced facts are evaluated against separate
+research hypotheses:
+
+- **Fundamental Inflection** requires revenue-growth acceleration plus
+  medium-term market confirmation.
+- **Value Recovery** requires discounted historical valuation plus market
+  confirmation, then looks for improving fundamentals.
+- **Quality Momentum** uses operating-margin improvement when FMP or Alpha
+  Vantage returns sufficient quarterly statements. It remains untestable when
+  that evidence is unavailable.
+- **Catalyst Underreaction** uses the latest positive earnings surprise when
+  FMP or Alpha Vantage returns it. Raised-guidance detection remains a future
+  point-in-time source.
+- **Early Reversal** preserves the original exhaustion/base thesis as its own
+  model rather than treating it as the universal opportunity shape.
+
+Each model shows fit, observable coverage, required-signal blockers, and
+evidence windows. Missing required signals leave a model untestable. Model fit
+is not presented as historical confidence or a win probability.
+
 Finviz's paid export is not required for manual discovery. Paste a full table
 captured by a browser table exporter into the Screener; AlphaConverge detects
 the `Ticker` column and scans only those symbols.
@@ -130,13 +153,14 @@ timer or canister HTTP-outcall loop without an explicit cycle budget.
   insider/13F detail is SEC EDGAR (keyless, but browser-blocked → needs a
   canister HTTP outcall). Prefer an external ingestion worker before adding
   recurring canister outcalls.
-- **Honest by construction.** A live ticker only has data for the Technical
-  category plus the partial sources listed below. Unsupported signals show
-  **"no data"** and cannot count toward convergence. With the current wiring,
-  Fundamental can reach only 18% coverage, Sentiment only 35%, and
-  Microstructure 0%; each needs 50% to align. Strict live Surfaced plays are
-  therefore not reachable yet. Technically aligned names are labeled
-  Candidates instead. Sample tickers remain badged **Preview** on Examples.
+- **Honest by construction.** Unsupported signals show **"no data"** and cannot
+  count toward convergence or model qualification. Actual coverage depends on
+  which configured account endpoints return data. Finnhub can make Sentiment
+  align-capable; FMP and single-ticker Alpha Vantage enrichment can add
+  Fundamental and opportunity-model facts; Alpha Vantage options can add
+  partial Microstructure when the account permits it. The acquisition audit
+  reports the observed result instead of assuming theoretical access. Sample
+  tickers remain badged **Preview** on Examples.
 - **Architecture decision.** Public market data is fetched **browser-side**
   (per the project’s original design), not via canister HTTP outcalls — this
   avoids the ICP consensus problem for non-deterministic API responses and
